@@ -5,8 +5,10 @@ import (
 	"AnbariAPI/handler"
 	"AnbariAPI/middleware"
 	"AnbariAPI/repository"
+	"AnbariAPI/routes"
 	"AnbariAPI/service"
 	"log"
+	"os"
 
 	"github.com/gin-gonic/gin"
 )
@@ -30,6 +32,8 @@ func main() {
 
 	r := gin.Default()
 
+	routes.SetupRoutes(r)
+
 	auth := r.Group("/auth")
 	{
 		auth.POST("/register", authHandler.Register)
@@ -43,5 +47,14 @@ func main() {
 		protected.GET("/me", authHandler.GetCurrentUser)
 	}
 
-	r.Run(":8080")
+	port := getPort()
+	log.Printf("Server starting on port %s", port)
+	r.Run(":" + port)
+}
+
+func getPort() string {
+	if port := os.Getenv("PORT"); port != "" {
+		return port
+	}
+	return "8080"
 }

@@ -25,18 +25,17 @@ func Migrate(db *gorm.DB) error {
 	}
 
 	// Create indexes manually if needed (GORM tags handle most basic indexes)
-	indexes := []struct {
+indexes := []struct {
 		Table   string
 		Name    string
 		Columns string
 	}{
 		{"products", "idx_product_category", "category_id"},
 		{"products", "idx_product_name", "name"},
-		{"transactions", "idx_transaction_type", "type"},
-		{"transactions", "idx_transaction_date", "transaction_date"},
+		{"transactions", "idx_transaction_type", "transaction_type"},
+		{"transactions", "idx_transaction_date", "date"},
 		{"transaction_details", "idx_detail_transaction", "transaction_id"},
 		{"transaction_details", "idx_detail_product", "product_id"},
-		// Add specific indexes for users/sessions if uniqueIndex/index tags aren't enough
 	}
 
 	for _, idx := range indexes {
