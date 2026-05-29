@@ -5,9 +5,9 @@ import (
 	"AnbariAPI/model"
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/shopspring/decimal"
-	"gorm.io/gorm"
 )
 
 type ResolvedExitLine struct {
@@ -23,17 +23,20 @@ type ResolvedExitLine struct {
 	RemainingAfter  decimal.Decimal
 }
 
-type ExitResolver struct {
-	repo Repository
+// ExitResolver orchestrates the domain logic for mapping exit requests to actual inventory records.
+type ExitResolver interface {
+	Resolve(ctx context.Context, repo Repository, lines []dto.ExitLineRequest, forUpdate bool) ([]ResolvedExitLine, error)
 }
 
-func NewExitResolver(repo Repository) *ExitResolver {
-	return &ExitResolver{repo: repo}
+type exitResolver struct{}
+
+func NewExitResolver() ExitResolver {
+	return &exitResolver{}
 }
 
-func (er *ExitResolver) Resolve(
+func (er *exitResolver) Resolve(
 	ctx context.Context,
-	db *gorm.DB,
+	repo Repository,
 	lines []dto.ExitLineRequest,
 	forUpdate bool,
 ) ([]ResolvedExitLine, error) {
@@ -41,30 +44,50 @@ func (er *ExitResolver) Resolve(
 		return nil, ErrEmptyLines
 	}
 
+	// 1. Prevent Deadlocks: Collect unique batch IDs and sort them to ensure deterministic locking order.
+	batchIDMap := make(map[uint]bool)
+	for _, line := range lines {
+		batchIDMap[line.BatchID] = true
+	}
+
+	sortedBatchIDs := make([]uint, 0, len(batchIDMap))
+	for id := range batchIDMap {
+		sortedBatchIDs = append(sortedBatchIDs, id)
+	}
+	sort.Slice(sortedBatchIDs, func(i, j int) bool { return sortedBatchIDs[i] < sortedBatchIDs[j] })
+
+	// 2. Pre-fetch and lock batches safely
+	batchCache := make(map[uint]*model.InventoryBatch)
+	for _, id := range sortedBatchIDs {
+		batch, err := repo.GetBatch(ctx, id, forUpdate)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve batch %d: %w", id, err)
+		}
+		if batch.IsExhausted() {
+			return nil, fmt.Errorf("%w: batch %d", ErrInsufficientStock, batch.ID)
+		}
+		batchCache[id] = batch
+	}
+
 	resolved := make([]ResolvedExitLine, 0, len(lines))
 	batchDeductions := make(map[uint]decimal.Decimal)
 	productCache := make(map[uint]*model.Product)
 
+	// 3. Process lines in original order to maintain 1:1 mapping with request
 	for i, line := range lines {
-		batch, err := er.repo.GetBatch(ctx, db, line.BatchID, forUpdate)
-		if err != nil {
-			return nil, fmt.Errorf("line %d: %w", i, err)
-		}
-
-		if batch.IsExhausted() {
-			return nil, fmt.Errorf("%w: batch %d", ErrInsufficientStock, batch.ID)
-		}
+		batch := batchCache[line.BatchID]
 
 		product, ok := productCache[batch.ProductID]
 		if !ok {
-			product, err = er.repo.GetProduct(ctx, db, batch.ProductID)
+			var err error
+			product, err = repo.GetProduct(ctx, batch.ProductID)
 			if err != nil {
 				return nil, fmt.Errorf("line %d: %w", i, err)
 			}
 			productCache[batch.ProductID] = product
 		}
 
-		multiplier, err := resolveUnitMultiplier(ctx, db, er.repo, batch.ProductID, line.UnitName, product.BaseUnit)
+		multiplier, err := resolveUnitMultiplier(ctx, repo, batch.ProductID, line.UnitName, product.BaseUnit)
 		if err != nil {
 			return nil, fmt.Errorf("line %d: %w", i, err)
 		}
@@ -108,7 +131,6 @@ func (er *ExitResolver) Resolve(
 
 func resolveUnitMultiplier(
 	ctx context.Context,
-	db *gorm.DB,
 	repo Repository,
 	productID uint,
 	unitName string,
@@ -117,7 +139,7 @@ func resolveUnitMultiplier(
 	if unitName == baseUnit {
 		return decimal.NewFromInt(1), nil
 	}
-	pu, err := repo.GetProductUnit(ctx, db, productID, unitName)
+	pu, err := repo.GetProductUnit(ctx, productID, unitName)
 	if err != nil {
 		return decimal.Zero, err
 	}

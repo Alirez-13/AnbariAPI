@@ -1,7 +1,9 @@
+// Package Inventory provides domain logic, models, and repositories for managing stock.
 package Inventory
 
 import "errors"
 
+// Domain sentinel errors for the Inventory bounded context.
 var (
 	ErrProductNotFound   = errors.New("product not found")
 	ErrBatchNotFound     = errors.New("batch not found")

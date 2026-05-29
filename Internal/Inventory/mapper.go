@@ -7,18 +7,20 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// ToBatchAvailabilityDTO maps a database batch model to an availability DTO.
 func ToBatchAvailabilityDTO(b model.InventoryBatch) dto.BatchAvailabilityDTO {
 	return dto.BatchAvailabilityDTO{
 		BatchID:               b.ID,
 		EntryDate:             b.EntryDate,
 		EntryUnitName:         b.EntryUnitName,
-		EntryUnitMultiplier:     b.EntryUnitMultiplier,
-		OriginalPackPrice:       b.OriginalPackPrice,
-		OriginalBaseUnitPrice:   b.OriginalBaseUnitPrice,
-		RemainingBaseQuantity:   b.RemainingBaseQuantity,
+		EntryUnitMultiplier:   b.EntryUnitMultiplier,
+		OriginalPackPrice:     b.OriginalPackPrice,
+		OriginalBaseUnitPrice: b.OriginalBaseUnitPrice,
+		RemainingBaseQuantity: b.RemainingBaseQuantity,
 	}
 }
 
+// ToTransactionDTO maps a database transaction model and its details to a DTO.
 func ToTransactionDTO(txn *model.Transaction) *dto.TransactionDTO {
 	if txn == nil {
 		return nil
@@ -53,6 +55,7 @@ func ToTransactionDTO(txn *model.Transaction) *dto.TransactionDTO {
 	}
 }
 
+// ToExitPreviewLineDTO converts a resolved domain line into a UI-friendly preview object.
 func ToExitPreviewLineDTO(r ResolvedExitLine, requestedUnit string) dto.ExitPreviewLineDTO {
 	return dto.ExitPreviewLineDTO{
 		BatchID:               r.Batch.ID,

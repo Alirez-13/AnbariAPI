@@ -5,7 +5,7 @@ import (
 	"context"
 )
 
-// TransactionType constants for inventory operations
+// TransactionType constants for inventory operations.
 const (
 	TransactionTypeEntry = "IN"
 	TransactionTypeExit  = "OUT"
@@ -22,7 +22,7 @@ type InventoryService interface {
 	// Creates a transaction, details, and inventory batches atomically.
 	ProcessEntry(ctx context.Context, req dto.EntryRequest) (*dto.TransactionDTO, error)
 
-	// PreviewExit validates exit (OUT) request and returns expected deductions.
+	// PreviewExit validates an exit (OUT) request and returns expected deductions.
 	// Does not modify any data; useful for UI previews.
 	PreviewExit(ctx context.Context, req dto.ExitRequest) (*dto.ExitPreviewResponse, error)
 
