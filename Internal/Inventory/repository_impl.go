@@ -21,9 +21,7 @@ func NewRepository(db *gorm.DB) Repository {
 }
 
 func (r *repository) DoInTransaction(ctx context.Context, fn func(txRepo Repository) error) error {
-	// GORM's Transaction automatically handles panics and rollbacks.
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Provide a new repository instance bound strictly to this transaction
 		return fn(&repository{db: tx})
 	})
 }
@@ -32,24 +30,31 @@ func (r *repository) GetProduct(ctx context.Context, id uint) (*model.Product, e
 	var p model.Product
 	if err := r.db.WithContext(ctx).First(&p, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("%w: product %d", ErrProductNotFound, id)
+			return nil, fmt.Errorf("%w: ID %d", ErrProductNotFound, id)
 		}
 		return nil, fmt.Errorf("failed to get product %d: %w", id, err)
 	}
 	return &p, nil
 }
 
-func (r *repository) GetBatch(ctx context.Context, id uint, forUpdate bool) (*model.InventoryBatch, error) {
+func (r *repository) GetBatch(ctx context.Context, id uint) (*model.InventoryBatch, error) {
 	var b model.InventoryBatch
-	q := r.db.WithContext(ctx)
-	if forUpdate {
-		q = q.Clauses(clause.Locking{Strength: "UPDATE"})
-	}
-	if err := q.First(&b, id).Error; err != nil {
+	if err := r.db.WithContext(ctx).First(&b, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("%w: batch %d", ErrBatchNotFound, id)
+			return nil, fmt.Errorf("%w: ID %d", ErrBatchNotFound, id)
 		}
 		return nil, fmt.Errorf("failed to get batch %d: %w", id, err)
+	}
+	return &b, nil
+}
+
+func (r *repository) GetBatchForUpdate(ctx context.Context, id uint) (*model.InventoryBatch, error) {
+	var b model.InventoryBatch
+	if err := r.db.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).First(&b, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: ID %d", ErrBatchNotFound, id)
+		}
+		return nil, fmt.Errorf("failed to get batch for update %d: %w", id, err)
 	}
 	return &b, nil
 }
@@ -94,21 +99,21 @@ func (r *repository) GetTransactionWithDetails(ctx context.Context, transactionI
 
 func (r *repository) CreateTransaction(ctx context.Context, txn *model.Transaction) error {
 	if err := r.db.WithContext(ctx).Create(txn).Error; err != nil {
-		return fmt.Errorf("failed to create transaction: %w", err)
+		return fmt.Errorf("create transaction error: %w", err)
 	}
 	return nil
 }
 
 func (r *repository) CreateTransactionDetail(ctx context.Context, detail *model.TransactionDetail) error {
 	if err := r.db.WithContext(ctx).Create(detail).Error; err != nil {
-		return fmt.Errorf("failed to create transaction detail for product %d: %w", detail.ProductID, err)
+		return fmt.Errorf("create transaction detail for product %d: %w", detail.ProductID, err)
 	}
 	return nil
 }
 
 func (r *repository) CreateInventoryBatch(ctx context.Context, batch *model.InventoryBatch) error {
 	if err := r.db.WithContext(ctx).Create(batch).Error; err != nil {
-		return fmt.Errorf("failed to create inventory batch for product %d: %w", batch.ProductID, err)
+		return fmt.Errorf("create inventory batch for product %d: %w", batch.ProductID, err)
 	}
 	return nil
 }
@@ -118,8 +123,9 @@ func (r *repository) UpdateProductStock(ctx context.Context, productID uint, del
 		Model(&model.Product{}).
 		Where("id = ?", productID).
 		UpdateColumn("current_stock", gorm.Expr("current_stock + ?", delta))
+
 	if result.Error != nil {
-		return fmt.Errorf("failed to update stock for product %d: %w", productID, result.Error)
+		return fmt.Errorf("update stock for product %d: %w", productID, result.Error)
 	}
 	return nil
 }
@@ -128,9 +134,10 @@ func (r *repository) DeductBatchStock(ctx context.Context, batchID uint, amount 
 	result := r.db.WithContext(ctx).
 		Model(&model.InventoryBatch{}).
 		Where("id = ? AND remaining_base_quantity >= ?", batchID, amount).
-		Update("remaining_base_quantity", gorm.Expr("remaining_base_quantity - ?", amount))
+		UpdateColumn("remaining_base_quantity", gorm.Expr("remaining_base_quantity - ?", amount))
+
 	if result.Error != nil {
-		return 0, fmt.Errorf("failed to deduct stock from batch %d: %w", batchID, result.Error)
+		return 0, fmt.Errorf("deduct stock from batch %d: %w", batchID, result.Error)
 	}
 	return result.RowsAffected, nil
 }

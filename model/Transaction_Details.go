@@ -4,9 +4,8 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// TransactionDetail
 // ──────────────────────────────────────────────
-// TransactionDetail — added InputUnitPrice
-//
 // For IN:  InputUnitPrice = price the user typed (per entry unit)
 //
 //	BaseUnitPrice  = InputUnitPrice / Multiplier

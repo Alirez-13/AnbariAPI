@@ -13,4 +13,5 @@ var (
 	ErrExitFailed        = errors.New("failed to process exit")
 	ErrEmptyLines        = errors.New("no lines provided in request")
 	ErrInvalidQuantity   = errors.New("invalid quantity: must be greater than zero")
+	ErrConcurrentUpdate  = errors.New("concurrent modification detected")
 )

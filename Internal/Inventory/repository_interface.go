@@ -8,10 +8,10 @@ import (
 )
 
 // Repository defines the data access contract for inventory operations.
-// Implementation details (like GORM) are encapsulated and hidden from the caller.
 type Repository interface {
 	GetProduct(ctx context.Context, id uint) (*model.Product, error)
-	GetBatch(ctx context.Context, id uint, forUpdate bool) (*model.InventoryBatch, error)
+	GetBatch(ctx context.Context, id uint) (*model.InventoryBatch, error)
+	GetBatchForUpdate(ctx context.Context, id uint) (*model.InventoryBatch, error)
 	GetProductUnit(ctx context.Context, productID uint, unitName string) (*model.ProductUnit, error)
 	GetAvailableBatches(ctx context.Context, productID uint) ([]model.InventoryBatch, error)
 	GetTransactionWithDetails(ctx context.Context, transactionID uint) (*model.Transaction, error)
@@ -23,6 +23,5 @@ type Repository interface {
 	DeductBatchStock(ctx context.Context, batchID uint, amount decimal.Decimal) (int64, error)
 
 	// DoInTransaction executes the given function within a database transaction.
-	// It provides a transactional Repository instance to the callback.
 	DoInTransaction(ctx context.Context, fn func(txRepo Repository) error) error
 }

@@ -25,12 +25,15 @@ func ToTransactionDTO(txn *model.Transaction) *dto.TransactionDTO {
 	if txn == nil {
 		return nil
 	}
+
 	details := make([]dto.TransactionDetailDTO, 0, len(txn.Details))
 	for _, d := range txn.Details {
 		productName := ""
+		// Safe pointer checks
 		if d.Product.ID != 0 {
 			productName = d.Product.Name
 		}
+
 		details = append(details, dto.TransactionDetailDTO{
 			ID:               d.ID,
 			ProductID:        d.ProductID,
@@ -45,6 +48,7 @@ func ToTransactionDTO(txn *model.Transaction) *dto.TransactionDTO {
 			TotalPrice:       d.TotalPrice,
 		})
 	}
+
 	return &dto.TransactionDTO{
 		ID:              txn.ID,
 		TransactionType: txn.TransactionType,

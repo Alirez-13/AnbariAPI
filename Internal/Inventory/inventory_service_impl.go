@@ -9,25 +9,25 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-type inventoryService struct {
+type inventoryServiceImpl struct {
 	repo     Repository
 	resolver ExitResolver
 }
 
 // NewInventoryService creates an InventoryService with the required dependencies.
-// TODO: Update injection graph. Replace `NewInventoryService(db)` with `NewInventoryService(repo, resolver)`.
 func NewInventoryService(repo Repository, resolver ExitResolver) InventoryService {
-	return &inventoryService{
+	return &inventoryServiceImpl{
 		repo:     repo,
 		resolver: resolver,
 	}
 }
 
-func (s *inventoryService) GetAvailableBatches(ctx context.Context, productID uint) ([]dto.BatchAvailabilityDTO, error) {
+func (s *inventoryServiceImpl) GetAvailableBatches(ctx context.Context, productID uint) ([]dto.BatchAvailabilityDTO, error) {
 	batches, err := s.repo.GetAvailableBatches(ctx, productID)
 	if err != nil {
 		return nil, err
 	}
+
 	result := make([]dto.BatchAvailabilityDTO, 0, len(batches))
 	for _, b := range batches {
 		result = append(result, ToBatchAvailabilityDTO(b))
@@ -35,7 +35,7 @@ func (s *inventoryService) GetAvailableBatches(ctx context.Context, productID ui
 	return result, nil
 }
 
-func (s *inventoryService) ProcessEntry(ctx context.Context, req dto.EntryRequest) (*dto.TransactionDTO, error) {
+func (s *inventoryServiceImpl) ProcessEntry(ctx context.Context, req dto.EntryRequest) (*dto.TransactionDTO, error) {
 	if len(req.Lines) == 0 {
 		return nil, ErrEmptyLines
 	}
@@ -49,21 +49,36 @@ func (s *inventoryService) ProcessEntry(ctx context.Context, req dto.EntryReques
 			Date:            req.Date,
 		}
 		if err := txRepo.CreateTransaction(ctx, &transaction); err != nil {
-			return fmt.Errorf("%w: create transaction: %v", ErrEntryFailed, err)
+			return fmt.Errorf("failed to create entry transaction: %w", err)
 		}
 
 		transactionID = transaction.ID
 		productDeltas := make(map[uint]decimal.Decimal)
 
+		// Caches to prevent N+1 reads
+		productCache := make(map[uint]*model.Product)
+		unitCache := make(map[string]decimal.Decimal)
+
 		for _, line := range req.Lines {
-			product, err := txRepo.GetProduct(ctx, line.ProductID)
-			if err != nil {
-				return fmt.Errorf("process entry line for product %d: %w", line.ProductID, err)
+			product, ok := productCache[line.ProductID]
+			if !ok {
+				p, err := txRepo.GetProduct(ctx, line.ProductID)
+				if err != nil {
+					return fmt.Errorf("process entry line for product %d: %w", line.ProductID, err)
+				}
+				product = p
+				productCache[line.ProductID] = product
 			}
 
-			multiplier, err := resolveUnitMultiplier(ctx, txRepo, line.ProductID, line.UnitName, product.BaseUnit)
-			if err != nil {
-				return fmt.Errorf("resolve unit multiplier for product %d: %w", line.ProductID, err)
+			cacheKey := fmt.Sprintf("%d:%s", product.ID, line.UnitName)
+			multiplier, cached := unitCache[cacheKey]
+			if !cached {
+				m, err := resolveUnitMultiplier(ctx, txRepo, line.ProductID, line.UnitName, product.BaseUnit)
+				if err != nil {
+					return fmt.Errorf("resolve unit multiplier for product %d: %w", line.ProductID, err)
+				}
+				multiplier = m
+				unitCache[cacheKey] = multiplier
 			}
 
 			baseQuantity := line.Quantity.Mul(multiplier)
@@ -81,8 +96,9 @@ func (s *inventoryService) ProcessEntry(ctx context.Context, req dto.EntryReques
 				BaseUnitPrice:  baseUnitPrice,
 				TotalPrice:     totalPrice,
 			}
+
 			if err := txRepo.CreateTransactionDetail(ctx, &detail); err != nil {
-				return fmt.Errorf("%w: create detail: %v", ErrEntryFailed, err)
+				return fmt.Errorf("failed to create detail for product %d: %w", line.ProductID, err)
 			}
 
 			batch := model.InventoryBatch{
@@ -96,8 +112,9 @@ func (s *inventoryService) ProcessEntry(ctx context.Context, req dto.EntryReques
 				RemainingBaseQuantity: baseQuantity,
 				EntryDate:             req.Date,
 			}
+
 			if err := txRepo.CreateInventoryBatch(ctx, &batch); err != nil {
-				return fmt.Errorf("%w: create batch: %v", ErrEntryFailed, err)
+				return fmt.Errorf("failed to create batch for product %d: %w", line.ProductID, err)
 			}
 
 			productDeltas[line.ProductID] = productDeltas[line.ProductID].Add(baseQuantity)
@@ -105,7 +122,7 @@ func (s *inventoryService) ProcessEntry(ctx context.Context, req dto.EntryReques
 
 		for productID, delta := range productDeltas {
 			if err := txRepo.UpdateProductStock(ctx, productID, delta); err != nil {
-				return fmt.Errorf("%w: update product stock: %v", ErrEntryFailed, err)
+				return fmt.Errorf("failed to update stock for product %d: %w", productID, err)
 			}
 		}
 
@@ -113,13 +130,14 @@ func (s *inventoryService) ProcessEntry(ctx context.Context, req dto.EntryReques
 	})
 
 	if err != nil {
-		return nil, err
+		// Wrap with the domain-specific entry failure
+		return nil, fmt.Errorf("%w: %v", ErrEntryFailed, err)
 	}
 
 	return s.loadTransactionDTO(ctx, transactionID)
 }
 
-func (s *inventoryService) PreviewExit(ctx context.Context, req dto.ExitRequest) (*dto.ExitPreviewResponse, error) {
+func (s *inventoryServiceImpl) PreviewExit(ctx context.Context, req dto.ExitRequest) (*dto.ExitPreviewResponse, error) {
 	if len(req.Lines) == 0 {
 		return nil, ErrEmptyLines
 	}
@@ -149,7 +167,7 @@ func (s *inventoryService) PreviewExit(ctx context.Context, req dto.ExitRequest)
 	}, nil
 }
 
-func (s *inventoryService) ConfirmExit(ctx context.Context, req dto.ExitRequest) (*dto.TransactionDTO, error) {
+func (s *inventoryServiceImpl) ConfirmExit(ctx context.Context, req dto.ExitRequest) (*dto.TransactionDTO, error) {
 	if len(req.Lines) == 0 {
 		return nil, ErrEmptyLines
 	}
@@ -157,7 +175,6 @@ func (s *inventoryService) ConfirmExit(ctx context.Context, req dto.ExitRequest)
 	var transactionID uint
 
 	err := s.repo.DoInTransaction(ctx, func(txRepo Repository) error {
-		// Pass the transactional repository to the resolver
 		resolved, err := s.resolver.Resolve(ctx, txRepo, req.Lines, true)
 		if err != nil {
 			return err
@@ -168,8 +185,9 @@ func (s *inventoryService) ConfirmExit(ctx context.Context, req dto.ExitRequest)
 			Reference:       req.Reference,
 			Date:            req.Date,
 		}
+
 		if err := txRepo.CreateTransaction(ctx, &transaction); err != nil {
-			return fmt.Errorf("%w: create transaction: %v", ErrExitFailed, err)
+			return fmt.Errorf("failed to create exit transaction: %w", err)
 		}
 
 		transactionID = transaction.ID
@@ -189,16 +207,17 @@ func (s *inventoryService) ConfirmExit(ctx context.Context, req dto.ExitRequest)
 				BaseUnitPrice:    r.BaseUnitPrice,
 				TotalPrice:       r.LineTotal,
 			}
+
 			if err := txRepo.CreateTransactionDetail(ctx, &detail); err != nil {
-				return fmt.Errorf("%w: create detail: %v", ErrExitFailed, err)
+				return fmt.Errorf("failed to create detail for batch %d: %w", batchID, err)
 			}
 
 			rowsAffected, err := txRepo.DeductBatchStock(ctx, batchID, r.BaseQuantity)
 			if err != nil {
-				return fmt.Errorf("%w: update batch %d: %v", ErrExitFailed, batchID, err)
+				return fmt.Errorf("failed to deduct stock for batch %d: %w", batchID, err)
 			}
 			if rowsAffected == 0 {
-				return fmt.Errorf("%w: batch %d — concurrent modification detected", ErrInsufficientStock, batchID)
+				return fmt.Errorf("%w: batch %d", ErrConcurrentUpdate, batchID)
 			}
 
 			productDeltas[r.Product.ID] = productDeltas[r.Product.ID].Sub(r.BaseQuantity)
@@ -206,7 +225,7 @@ func (s *inventoryService) ConfirmExit(ctx context.Context, req dto.ExitRequest)
 
 		for productID, delta := range productDeltas {
 			if err := txRepo.UpdateProductStock(ctx, productID, delta); err != nil {
-				return fmt.Errorf("%w: update product stock: %v", ErrExitFailed, err)
+				return fmt.Errorf("failed to update stock for product %d: %w", productID, err)
 			}
 		}
 
@@ -214,13 +233,13 @@ func (s *inventoryService) ConfirmExit(ctx context.Context, req dto.ExitRequest)
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", ErrExitFailed, err)
 	}
 
 	return s.loadTransactionDTO(ctx, transactionID)
 }
 
-func (s *inventoryService) loadTransactionDTO(ctx context.Context, transactionID uint) (*dto.TransactionDTO, error) {
+func (s *inventoryServiceImpl) loadTransactionDTO(ctx context.Context, transactionID uint) (*dto.TransactionDTO, error) {
 	txn, err := s.repo.GetTransactionWithDetails(ctx, transactionID)
 	if err != nil {
 		return nil, err
