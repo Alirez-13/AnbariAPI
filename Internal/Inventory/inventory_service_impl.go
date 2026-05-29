@@ -13,15 +13,17 @@ import (
 type inventoryService struct {
 	db       *gorm.DB
 	repo     Repository
-	resolver *exitResolver
+	resolver *ExitResolver
 }
 
+// NewInventoryService creates an InventoryService with the required dependencies.
+// Dependencies are managed internally using the provided database connection.
 func NewInventoryService(db *gorm.DB) InventoryService {
 	repo := NewRepository(db)
 	return &inventoryService{
 		db:       db,
 		repo:     repo,
-		resolver: newExitResolver(repo),
+		resolver: NewExitResolver(repo),
 	}
 }
 
@@ -32,21 +34,26 @@ func (s *inventoryService) GetAvailableBatches(ctx context.Context, productID ui
 	}
 	result := make([]dto.BatchAvailabilityDTO, 0, len(batches))
 	for _, b := range batches {
-		result = append(result, toBatchAvailabilityDTO(b))
+		result = append(result, ToBatchAvailabilityDTO(b))
 	}
 	return result, nil
 }
 
 func (s *inventoryService) ProcessEntry(ctx context.Context, req dto.EntryRequest) (*dto.TransactionDTO, error) {
+	if len(req.Lines) == 0 {
+		return nil, ErrEmptyLines
+	}
+
 	tx := s.db.WithContext(ctx).Begin()
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
+			panic(r)
 		}
 	}()
 
 	transaction := model.Transaction{
-		TransactionType: "IN",
+		TransactionType: TransactionTypeEntry,
 		Reference:       req.Reference,
 		Date:            req.Date,
 	}
@@ -61,13 +68,13 @@ func (s *inventoryService) ProcessEntry(ctx context.Context, req dto.EntryReques
 		product, err := s.repo.GetProduct(ctx, tx, line.ProductID)
 		if err != nil {
 			tx.Rollback()
-			return nil, err
+			return nil, fmt.Errorf("process entry line for product %d: %w", line.ProductID, err)
 		}
 
 		multiplier, err := resolveUnitMultiplier(ctx, tx, s.repo, line.ProductID, line.UnitName, product.BaseUnit)
 		if err != nil {
 			tx.Rollback()
-			return nil, err
+			return nil, fmt.Errorf("resolve unit multiplier for product %d: %w", line.ProductID, err)
 		}
 
 		baseQuantity := line.Quantity.Mul(multiplier)
@@ -79,11 +86,11 @@ func (s *inventoryService) ProcessEntry(ctx context.Context, req dto.EntryReques
 			ProductID:      line.ProductID,
 			UnitName:       line.UnitName,
 			Multiplier:     multiplier,
-			InputQuantity:  line.Quantity,
-			BaseQuantity:   baseQuantity,
-			InputUnitPrice: line.InputUnitPrice,
-			BaseUnitPrice:  baseUnitPrice,
-			TotalPrice:     totalPrice,
+			InputQuantity:    line.Quantity,
+			BaseQuantity:     baseQuantity,
+			InputUnitPrice:   line.InputUnitPrice,
+			BaseUnitPrice:    baseUnitPrice,
+			TotalPrice:       totalPrice,
 		}
 		if err := s.repo.CreateTransactionDetail(ctx, tx, &detail); err != nil {
 			tx.Rollback()
@@ -94,12 +101,12 @@ func (s *inventoryService) ProcessEntry(ctx context.Context, req dto.EntryReques
 			ProductID:             line.ProductID,
 			EntryDetailID:         detail.ID,
 			EntryUnitName:         line.UnitName,
-			EntryUnitMultiplier:   multiplier,
-			OriginalPackPrice:     line.InputUnitPrice,
-			OriginalBaseUnitPrice: baseUnitPrice,
-			InitialBaseQuantity:   baseQuantity,
-			RemainingBaseQuantity: baseQuantity,
-			EntryDate:             req.Date,
+			EntryUnitMultiplier:     multiplier,
+			OriginalPackPrice:       line.InputUnitPrice,
+			OriginalBaseUnitPrice:   baseUnitPrice,
+			InitialBaseQuantity:     baseQuantity,
+			RemainingBaseQuantity:   baseQuantity,
+			EntryDate:               req.Date,
 		}
 		if err := s.repo.CreateInventoryBatch(ctx, tx, &batch); err != nil {
 			tx.Rollback()
@@ -124,7 +131,11 @@ func (s *inventoryService) ProcessEntry(ctx context.Context, req dto.EntryReques
 }
 
 func (s *inventoryService) PreviewExit(ctx context.Context, req dto.ExitRequest) (*dto.ExitPreviewResponse, error) {
-	resolved, err := s.resolver.resolve(ctx, s.db, req.Lines, false)
+	if len(req.Lines) == 0 {
+		return nil, ErrEmptyLines
+	}
+
+	resolved, err := s.resolver.Resolve(ctx, s.db, req.Lines, false)
 	if err != nil {
 		return nil, err
 	}
@@ -134,11 +145,11 @@ func (s *inventoryService) PreviewExit(ctx context.Context, req dto.ExitRequest)
 	allSufficient := true
 
 	for i, r := range resolved {
-		if r.remainingAfter.LessThan(decimal.Zero) {
+		if r.RemainingAfter.LessThan(decimal.Zero) {
 			allSufficient = false
 		}
-		totalCost = totalCost.Add(r.lineTotal)
-		previewLines = append(previewLines, toExitPreviewLineDTO(r, req.Lines[i].UnitName))
+		totalCost = totalCost.Add(r.LineTotal)
+		previewLines = append(previewLines, ToExitPreviewLineDTO(r, req.Lines[i].UnitName))
 	}
 
 	return &dto.ExitPreviewResponse{
@@ -149,21 +160,26 @@ func (s *inventoryService) PreviewExit(ctx context.Context, req dto.ExitRequest)
 }
 
 func (s *inventoryService) ConfirmExit(ctx context.Context, req dto.ExitRequest) (*dto.TransactionDTO, error) {
+	if len(req.Lines) == 0 {
+		return nil, ErrEmptyLines
+	}
+
 	tx := s.db.WithContext(ctx).Begin()
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
+			panic(r)
 		}
 	}()
 
-	resolved, err := s.resolver.resolve(ctx, tx, req.Lines, true)
+	resolved, err := s.resolver.Resolve(ctx, tx, req.Lines, true)
 	if err != nil {
 		tx.Rollback()
 		return nil, err
 	}
 
 	transaction := model.Transaction{
-		TransactionType: "OUT",
+		TransactionType: TransactionTypeExit,
 		Reference:       req.Reference,
 		Date:            req.Date,
 	}
@@ -175,25 +191,25 @@ func (s *inventoryService) ConfirmExit(ctx context.Context, req dto.ExitRequest)
 	productDeltas := make(map[uint]decimal.Decimal)
 
 	for i, r := range resolved {
-		batchID := r.batch.ID
+		batchID := r.Batch.ID
 		detail := model.TransactionDetail{
 			TransactionID:    transaction.ID,
-			ProductID:        r.product.ID,
+			ProductID:        r.Product.ID,
 			InventoryBatchID: &batchID,
 			UnitName:         req.Lines[i].UnitName,
-			Multiplier:       r.multiplier,
-			InputQuantity:    r.inputQuantity,
-			BaseQuantity:     r.baseQuantity,
-			InputUnitPrice:   r.inputUnitPrice,
-			BaseUnitPrice:    r.baseUnitPrice,
-			TotalPrice:       r.lineTotal,
+			Multiplier:       r.Multiplier,
+			InputQuantity:    r.InputQuantity,
+			BaseQuantity:       r.BaseQuantity,
+			InputUnitPrice:     r.InputUnitPrice,
+			BaseUnitPrice:      r.BaseUnitPrice,
+			TotalPrice:         r.LineTotal,
 		}
 		if err := s.repo.CreateTransactionDetail(ctx, tx, &detail); err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("%w: create detail: %v", ErrExitFailed, err)
 		}
 
-		rowsAffected, err := s.repo.DeductBatchStock(ctx, tx, batchID, r.baseQuantity)
+		rowsAffected, err := s.repo.DeductBatchStock(ctx, tx, batchID, r.BaseQuantity)
 		if err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("%w: update batch %d: %v", ErrExitFailed, batchID, err)
@@ -203,7 +219,7 @@ func (s *inventoryService) ConfirmExit(ctx context.Context, req dto.ExitRequest)
 			return nil, fmt.Errorf("%w: batch %d — concurrent modification detected or insufficient stock", ErrInsufficientStock, batchID)
 		}
 
-		productDeltas[r.product.ID] = productDeltas[r.product.ID].Sub(r.baseQuantity)
+		productDeltas[r.Product.ID] = productDeltas[r.Product.ID].Sub(r.BaseQuantity)
 	}
 
 	for productID, delta := range productDeltas {
@@ -225,5 +241,5 @@ func (s *inventoryService) loadTransactionDTO(ctx context.Context, transactionID
 	if err != nil {
 		return nil, err
 	}
-	return toTransactionDTO(txn), nil
+	return ToTransactionDTO(txn), nil
 }

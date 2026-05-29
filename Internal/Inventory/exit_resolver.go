@@ -10,59 +10,63 @@ import (
 	"gorm.io/gorm"
 )
 
-type resolvedExitLine struct {
-	batch           *model.InventoryBatch
-	product         *model.Product
-	multiplier      decimal.Decimal
-	inputQuantity   decimal.Decimal
-	baseQuantity    decimal.Decimal
-	baseUnitPrice   decimal.Decimal
-	inputUnitPrice  decimal.Decimal
-	lineTotal       decimal.Decimal
-	remainingBefore decimal.Decimal
-	remainingAfter  decimal.Decimal
+type ResolvedExitLine struct {
+	Batch           *model.InventoryBatch
+	Product         *model.Product
+	Multiplier      decimal.Decimal
+	InputQuantity   decimal.Decimal
+	BaseQuantity    decimal.Decimal
+	BaseUnitPrice   decimal.Decimal
+	InputUnitPrice  decimal.Decimal
+	LineTotal       decimal.Decimal
+	RemainingBefore decimal.Decimal
+	RemainingAfter  decimal.Decimal
 }
 
-type exitResolver struct {
+type ExitResolver struct {
 	repo Repository
 }
 
-func newExitResolver(repo Repository) *exitResolver {
-	return &exitResolver{repo: repo}
+func NewExitResolver(repo Repository) *ExitResolver {
+	return &ExitResolver{repo: repo}
 }
 
-func (er *exitResolver) resolve(
+func (er *ExitResolver) Resolve(
 	ctx context.Context,
 	db *gorm.DB,
 	lines []dto.ExitLineRequest,
 	forUpdate bool,
-) ([]resolvedExitLine, error) {
-	resolved := make([]resolvedExitLine, 0, len(lines))
+) ([]ResolvedExitLine, error) {
+	if len(lines) == 0 {
+		return nil, ErrEmptyLines
+	}
+
+	resolved := make([]ResolvedExitLine, 0, len(lines))
 	batchDeductions := make(map[uint]decimal.Decimal)
 	productCache := make(map[uint]*model.Product)
 
-	for _, line := range lines {
+	for i, line := range lines {
 		batch, err := er.repo.GetBatch(ctx, db, line.BatchID, forUpdate)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("line %d: %w", i, err)
 		}
 
-		if batch.RemainingBaseQuantity.LessThanOrEqual(decimal.Zero) {
-			return nil, fmt.Errorf("%w: batch %d is exhausted", ErrInsufficientStock, batch.ID)
+		if batch.IsExhausted() {
+			return nil, fmt.Errorf("%w: batch %d", ErrInsufficientStock, batch.ID)
 		}
 
 		product, ok := productCache[batch.ProductID]
 		if !ok {
 			product, err = er.repo.GetProduct(ctx, db, batch.ProductID)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("line %d: %w", i, err)
 			}
 			productCache[batch.ProductID] = product
 		}
 
 		multiplier, err := resolveUnitMultiplier(ctx, db, er.repo, batch.ProductID, line.UnitName, product.BaseUnit)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("line %d: %w", i, err)
 		}
 
 		baseQuantity := line.Quantity.Mul(multiplier)
@@ -85,24 +89,23 @@ func (er *exitResolver) resolve(
 
 		batchDeductions[batch.ID] = prevDeduction.Add(baseQuantity)
 
-		resolved = append(resolved, resolvedExitLine{
-			batch:           batch,
-			product:         product,
-			multiplier:      multiplier,
-			inputQuantity:   line.Quantity,
-			baseQuantity:    baseQuantity,
-			baseUnitPrice:   baseUnitPrice,
-			inputUnitPrice:  inputUnitPrice,
-			lineTotal:       lineTotal,
-			remainingBefore: batch.RemainingBaseQuantity,
-			remainingAfter:  effectiveRemaining.Sub(baseQuantity),
+		resolved = append(resolved, ResolvedExitLine{
+			Batch:           batch,
+			Product:         product,
+			Multiplier:      multiplier,
+			InputQuantity:   line.Quantity,
+			BaseQuantity:    baseQuantity,
+			BaseUnitPrice:   baseUnitPrice,
+			InputUnitPrice:  inputUnitPrice,
+			LineTotal:       lineTotal,
+			RemainingBefore: batch.RemainingBaseQuantity,
+			RemainingAfter:  effectiveRemaining.Sub(baseQuantity),
 		})
 	}
 
 	return resolved, nil
 }
 
-// resolveUnitMultiplier is a pure calculation helper — no receiver needed.
 func resolveUnitMultiplier(
 	ctx context.Context,
 	db *gorm.DB,

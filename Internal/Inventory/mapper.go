@@ -7,19 +7,22 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func toBatchAvailabilityDTO(b model.InventoryBatch) dto.BatchAvailabilityDTO {
+func ToBatchAvailabilityDTO(b model.InventoryBatch) dto.BatchAvailabilityDTO {
 	return dto.BatchAvailabilityDTO{
 		BatchID:               b.ID,
 		EntryDate:             b.EntryDate,
 		EntryUnitName:         b.EntryUnitName,
-		EntryUnitMultiplier:   b.EntryUnitMultiplier,
-		OriginalPackPrice:     b.OriginalPackPrice,
-		OriginalBaseUnitPrice: b.OriginalBaseUnitPrice,
-		RemainingBaseQuantity: b.RemainingBaseQuantity,
+		EntryUnitMultiplier:     b.EntryUnitMultiplier,
+		OriginalPackPrice:       b.OriginalPackPrice,
+		OriginalBaseUnitPrice:   b.OriginalBaseUnitPrice,
+		RemainingBaseQuantity:   b.RemainingBaseQuantity,
 	}
 }
 
-func toTransactionDTO(txn *model.Transaction) *dto.TransactionDTO {
+func ToTransactionDTO(txn *model.Transaction) *dto.TransactionDTO {
+	if txn == nil {
+		return nil
+	}
 	details := make([]dto.TransactionDetailDTO, 0, len(txn.Details))
 	for _, d := range txn.Details {
 		productName := ""
@@ -50,21 +53,21 @@ func toTransactionDTO(txn *model.Transaction) *dto.TransactionDTO {
 	}
 }
 
-func toExitPreviewLineDTO(r resolvedExitLine, requestedUnit string) dto.ExitPreviewLineDTO {
+func ToExitPreviewLineDTO(r ResolvedExitLine, requestedUnit string) dto.ExitPreviewLineDTO {
 	return dto.ExitPreviewLineDTO{
-		BatchID:               r.batch.ID,
-		ProductID:             r.product.ID,
-		ProductName:           r.product.Name,
-		EntryDate:             r.batch.EntryDate,
+		BatchID:               r.Batch.ID,
+		ProductID:             r.Product.ID,
+		ProductName:           r.Product.Name,
+		EntryDate:             r.Batch.EntryDate,
 		RequestedUnit:         requestedUnit,
-		RequestedQuantity:     r.inputQuantity,
-		Multiplier:            r.multiplier,
-		BaseQuantity:          r.baseQuantity,
-		OriginalBaseUnitPrice: r.baseUnitPrice,
-		OriginalPackPrice:     r.batch.OriginalPackPrice,
-		LineTotal:             r.lineTotal,
-		RemainingBeforeExit:   r.remainingBefore,
-		RemainingAfterExit:    r.remainingAfter,
-		Sufficient:            r.remainingAfter.GreaterThanOrEqual(decimal.Zero),
+		RequestedQuantity:     r.InputQuantity,
+		Multiplier:            r.Multiplier,
+		BaseQuantity:          r.BaseQuantity,
+		OriginalBaseUnitPrice: r.BaseUnitPrice,
+		OriginalPackPrice:     r.Batch.OriginalPackPrice,
+		LineTotal:             r.LineTotal,
+		RemainingBeforeExit:   r.RemainingBefore,
+		RemainingAfterExit:    r.RemainingAfter,
+		Sufficient:            r.RemainingAfter.GreaterThanOrEqual(decimal.Zero),
 	}
 }

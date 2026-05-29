@@ -3,6 +3,7 @@ package Inventory
 import (
 	"AnbariAPI/model"
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/shopspring/decimal"
@@ -21,7 +22,10 @@ func NewRepository(db *gorm.DB) Repository {
 func (r *repository) GetProduct(ctx context.Context, db *gorm.DB, id uint) (*model.Product, error) {
 	var p model.Product
 	if err := db.WithContext(ctx).First(&p, id).Error; err != nil {
-		return nil, fmt.Errorf("%w: product %d", ErrProductNotFound, id)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: product %d", ErrProductNotFound, id)
+		}
+		return nil, fmt.Errorf("failed to get product %d: %w", id, err)
 	}
 	return &p, nil
 }
@@ -33,7 +37,10 @@ func (r *repository) GetBatch(ctx context.Context, db *gorm.DB, id uint, forUpda
 		q = q.Clauses(clause.Locking{Strength: "UPDATE"})
 	}
 	if err := q.First(&b, id).Error; err != nil {
-		return nil, fmt.Errorf("%w: batch %d", ErrBatchNotFound, id)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: batch %d", ErrBatchNotFound, id)
+		}
+		return nil, fmt.Errorf("failed to get batch %d: %w", id, err)
 	}
 	return &b, nil
 }
@@ -43,7 +50,10 @@ func (r *repository) GetProductUnit(ctx context.Context, db *gorm.DB, productID 
 	if err := db.WithContext(ctx).
 		Where("product_id = ? AND unit_name = ?", productID, unitName).
 		First(&pu).Error; err != nil {
-		return nil, fmt.Errorf("%w: %q for product %d", ErrInvalidUnit, unitName, productID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: %q for product %d", ErrInvalidUnit, unitName, productID)
+		}
+		return nil, fmt.Errorf("failed to get product unit %q for product %d: %w", unitName, productID, err)
 	}
 	return &pu, nil
 }
@@ -54,7 +64,7 @@ func (r *repository) GetAvailableBatches(ctx context.Context, productID uint) ([
 		Where("product_id = ? AND remaining_base_quantity > 0", productID).
 		Order("entry_date ASC, id ASC").
 		Find(&batches).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get available batches for product %d: %w", productID, err)
 	}
 	return batches, nil
 }
@@ -65,29 +75,44 @@ func (r *repository) GetTransactionWithDetails(ctx context.Context, transactionI
 		Preload("Details.Product").
 		Preload("Details.InventoryBatch").
 		First(&txn, transactionID).Error; err != nil {
-		return nil, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("transaction %d not found: %w", transactionID, err)
+		}
+		return nil, fmt.Errorf("failed to get transaction %d with details: %w", transactionID, err)
 	}
 	return &txn, nil
 }
 
 func (r *repository) CreateTransaction(ctx context.Context, db *gorm.DB, txn *model.Transaction) error {
-	return db.WithContext(ctx).Create(txn).Error
+	if err := db.WithContext(ctx).Create(txn).Error; err != nil {
+		return fmt.Errorf("failed to create transaction: %w", err)
+	}
+	return nil
 }
 
 func (r *repository) CreateTransactionDetail(ctx context.Context, db *gorm.DB, detail *model.TransactionDetail) error {
-	return db.WithContext(ctx).Create(detail).Error
+	if err := db.WithContext(ctx).Create(detail).Error; err != nil {
+		return fmt.Errorf("failed to create transaction detail for product %d: %w", detail.ProductID, err)
+	}
+	return nil
 }
 
 func (r *repository) CreateInventoryBatch(ctx context.Context, db *gorm.DB, batch *model.InventoryBatch) error {
-	return db.WithContext(ctx).Create(batch).Error
+	if err := db.WithContext(ctx).Create(batch).Error; err != nil {
+		return fmt.Errorf("failed to create inventory batch for product %d: %w", batch.ProductID, err)
+	}
+	return nil
 }
 
 func (r *repository) UpdateProductStock(ctx context.Context, db *gorm.DB, productID uint, delta decimal.Decimal) error {
-	return db.WithContext(ctx).
+	result := db.WithContext(ctx).
 		Model(&model.Product{}).
 		Where("id = ?", productID).
-		UpdateColumn("current_stock", gorm.Expr("current_stock + ?", delta)).
-		Error
+		UpdateColumn("current_stock", gorm.Expr("current_stock + ?", delta))
+	if result.Error != nil {
+		return fmt.Errorf("failed to update stock for product %d: %w", productID, result.Error)
+	}
+	return nil
 }
 
 func (r *repository) DeductBatchStock(ctx context.Context, db *gorm.DB, batchID uint, amount decimal.Decimal) (int64, error) {
@@ -95,5 +120,8 @@ func (r *repository) DeductBatchStock(ctx context.Context, db *gorm.DB, batchID 
 		Model(&model.InventoryBatch{}).
 		Where("id = ? AND remaining_base_quantity >= ?", batchID, amount).
 		Update("remaining_base_quantity", gorm.Expr("remaining_base_quantity - ?", amount))
-	return result.RowsAffected, result.Error
+	if result.Error != nil {
+		return 0, fmt.Errorf("failed to deduct stock from batch %d: %w", batchID, result.Error)
+	}
+	return result.RowsAffected, nil
 }
