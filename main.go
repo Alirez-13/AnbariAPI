@@ -1,13 +1,14 @@
 package main
 
 import (
-	"AnbariAPI/database"
-	"AnbariAPI/handler"
-	"AnbariAPI/middleware"
-	"AnbariAPI/repository"
-	"AnbariAPI/routes"
-	"AnbariAPI/service"
+	"AnbariAPI/Internal/auth/handler"
+	"AnbariAPI/Internal/auth/middleware"
+	"AnbariAPI/Internal/auth/repository"
+	"AnbariAPI/Internal/auth/service"
+	"AnbariAPI/api/routes"
+	"AnbariAPI/shared/database"
 	"log"
+	"log/slog"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -27,19 +28,12 @@ func main() {
 
 	userRepo := repository.NewUserRepository(db)
 	sessionRepo := repository.NewSessionRepository(db)
-	authService := service.NewAuthService(userRepo, sessionRepo)
+	authService := service.NewAuthService(userRepo, sessionRepo, slog.Default())
 	authHandler := handler.NewAuthHandler(authService)
 
 	r := gin.Default()
 
-	routes.SetupRoutes(r)
-
-	auth := r.Group("/auth")
-	{
-		auth.POST("/register", authHandler.Register)
-		auth.POST("/login", authHandler.Login)
-		auth.POST("/logout", authHandler.Logout)
-	}
+	routes.SetupRoutes(r, db, authHandler)
 
 	protected := r.Group("/api")
 	protected.Use(middleware.SessionAuth(authService))
