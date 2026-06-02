@@ -1,7 +1,6 @@
 package models
 
 import (
-	models2 "AnbariAPI/Internal/Inventory/models"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -16,8 +15,8 @@ type Product struct {
 	BaseUnit     string          `gorm:"size:50;not null" json:"base_unit"`
 	CurrentStock decimal.Decimal `gorm:"type:numeric(15,4);default:0;not null" json:"current_stock"`
 
-	Units   []ProductUnit            `gorm:"foreignKey:ProductID" json:"units,omitempty"`
-	Batches []models2.InventoryBatch `gorm:"foreignKey:ProductID" json:"batches,omitempty"`
+	Units   []ProductUnit    `gorm:"foreignKey:ProductID" json:"units,omitempty"`
+	Batches []InventoryBatch `gorm:"foreignKey:ProductID" json:"batches,omitempty"`
 
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`

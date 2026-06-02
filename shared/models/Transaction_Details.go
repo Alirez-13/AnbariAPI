@@ -1,8 +1,6 @@
 package models
 
 import (
-	models3 "AnbariAPI/catalog/models"
-
 	"github.com/shopspring/decimal"
 )
 
@@ -21,7 +19,7 @@ type TransactionDetail struct {
 	ID               uint            `gorm:"primaryKey" json:"id"`
 	TransactionID    uint            `gorm:"not null;index" json:"transaction_id"`
 	ProductID        uint            `gorm:"not null;index" json:"product_id"`
-	Product          models3.Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+	Product          Product         `gorm:"foreignKey:ProductID" json:"product,omitempty"`
 	InventoryBatchID *uint           `gorm:"index" json:"inventory_batch_id,omitempty"` // NULL for IN, required for OUT
 	InventoryBatch   *InventoryBatch `gorm:"foreignKey:InventoryBatchID" json:"inventory_batch,omitempty"`
 

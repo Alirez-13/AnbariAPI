@@ -1,9 +1,8 @@
 package migration
 
 import (
-	models4 "AnbariAPI/Internal/Inventory/models"
 	models3 "AnbariAPI/Internal/auth/models"
-	models2 "AnbariAPI/catalog/models"
+	"AnbariAPI/shared/models"
 	"log"
 
 	"gorm.io/gorm"
@@ -15,10 +14,10 @@ func Migrate(db *gorm.DB) error {
 
 	// Auto-migrate schema
 	err := db.AutoMigrate(
-		&models2.Category{},
-		&models2.Product{},
-		&models4.Transaction{},
-		&models4.TransactionDetail{},
+		&models.Category{},
+		&models.Product{},
+		&models.Transaction{},
+		&models.TransactionDetail{},
 		&models3.User{},    // ADDED User
 		&models3.Session{}, // ADDED Session
 	)

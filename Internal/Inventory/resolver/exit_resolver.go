@@ -3,9 +3,8 @@ package resolver
 import (
 	"AnbariAPI/Internal/Inventory"
 	"AnbariAPI/Internal/Inventory/dto"
-	models2 "AnbariAPI/Internal/Inventory/models"
 	"AnbariAPI/Internal/Inventory/repository"
-	"AnbariAPI/catalog/models"
+	models2 "AnbariAPI/shared/models"
 	"context"
 	"fmt"
 	"sort"
@@ -15,7 +14,7 @@ import (
 
 type ResolvedExitLine struct {
 	Batch           *models2.InventoryBatch
-	Product         *models.Product
+	Product         *models2.Product
 	Multiplier      decimal.Decimal
 	InputQuantity   decimal.Decimal
 	BaseQuantity    decimal.Decimal
@@ -85,7 +84,7 @@ func (er *exitResolverImpl) Resolve(
 	batchDeductions := make(map[uint]decimal.Decimal)
 
 	// Local caches to prevent N+1 queries during resolution loop
-	productCache := make(map[uint]*models.Product)
+	productCache := make(map[uint]*models2.Product)
 	unitCache := make(map[string]decimal.Decimal) // Key format: "productID:unitName"
 
 	// 3. Process lines in original order to maintain 1:1 mapping with request

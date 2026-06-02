@@ -2,8 +2,8 @@ package handler
 
 import (
 	dto2 "AnbariAPI/catalog/dto"
-	models2 "AnbariAPI/catalog/models"
 	"AnbariAPI/shared/database"
+	"AnbariAPI/shared/models"
 	"net/http"
 	"strconv"
 
@@ -22,7 +22,7 @@ func CreateProduct(c *gin.Context) {
 	}
 
 	db := database.GetDB()
-	var category models2.Category
+	var category models.Category
 	if err := db.First(&category, req.CategoryID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusBadRequest, dto2.ErrorResponse{
@@ -38,7 +38,7 @@ func CreateProduct(c *gin.Context) {
 		return
 	}
 
-	product := models2.Product{
+	product := models.Product{
 		CategoryID:   req.CategoryID,
 		Name:         req.Name,
 		Attribute:    req.Attribute,
@@ -89,7 +89,7 @@ func GetProduct(c *gin.Context) {
 	}
 
 	db := database.GetDB()
-	var product models2.Product
+	var product models.Product
 	if err := db.Preload("Category").First(&product, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, dto2.ErrorResponse{
@@ -125,10 +125,10 @@ func GetProduct(c *gin.Context) {
 
 func ListProducts(c *gin.Context) {
 	db := database.GetDB()
-	var products []models2.Product
+	var products []models.Product
 	var total int64
 
-	if err := db.Model(&models2.Product{}).Count(&total).Error; err != nil {
+	if err := db.Model(&models.Product{}).Count(&total).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto2.ErrorResponse{
 			Error:   "database_error",
 			Message: "Failed to fetch products",
@@ -182,7 +182,7 @@ func DeleteProduct(c *gin.Context) {
 	}
 
 	db := database.GetDB()
-	result := db.Delete(&models2.Product{}, id)
+	result := db.Delete(&models.Product{}, id)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, dto2.ErrorResponse{
 			Error:   "database_error",

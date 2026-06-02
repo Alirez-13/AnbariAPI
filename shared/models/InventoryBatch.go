@@ -1,7 +1,6 @@
 package models
 
 import (
-	models2 "AnbariAPI/catalog/models"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -14,9 +13,9 @@ import (
 // is self-describing without joining back.
 // ──────────────────────────────────────────────
 type InventoryBatch struct {
-	ID        uint            `gorm:"primaryKey" json:"id"`
-	ProductID uint            `gorm:"not null;index" json:"product_id"`
-	Product   models2.Product `gorm:"foreignKey:ProductID" json:"-"`
+	ID        uint    `gorm:"primaryKey" json:"id"`
+	ProductID uint    `gorm:"not null;index" json:"product_id"`
+	Product   Product `gorm:"foreignKey:ProductID" json:"-"`
 
 	// Audit link back to the IN TransactionDetail that created this batch.
 	// Immutable after creation.
