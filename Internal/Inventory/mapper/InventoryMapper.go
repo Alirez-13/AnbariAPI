@@ -1,15 +1,15 @@
 package mapper
 
 import (
+	"AnbariAPI/Internal/Inventory/domain"
 	dto2 "AnbariAPI/Internal/Inventory/dto"
 	"AnbariAPI/Internal/Inventory/resolver"
-	"AnbariAPI/shared/models"
 
 	"github.com/shopspring/decimal"
 )
 
-// ToBatchAvailabilityDTO maps a database batch models to an availability DTO.
-func ToBatchAvailabilityDTO(b models.InventoryBatch) dto2.BatchAvailabilityDTO {
+// ToBatchAvailabilityDTO maps a database batch domain to an availability DTO.
+func ToBatchAvailabilityDTO(b domain.InventoryBatch) dto2.BatchAvailabilityDTO {
 	return dto2.BatchAvailabilityDTO{
 		BatchID:               b.ID,
 		EntryDate:             b.EntryDate,
@@ -21,8 +21,8 @@ func ToBatchAvailabilityDTO(b models.InventoryBatch) dto2.BatchAvailabilityDTO {
 	}
 }
 
-// ToTransactionDTO maps a database transaction models and its details to a DTO.
-func ToTransactionDTO(txn *models.Transaction) *dto2.TransactionDTO {
+// ToTransactionDTO maps a database transaction domain and its details to a DTO.
+func ToTransactionDTO(txn *domain.Transaction) *dto2.TransactionDTO {
 	if txn == nil {
 		return nil
 	}

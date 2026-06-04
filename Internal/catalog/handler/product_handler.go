@@ -1,9 +1,9 @@
 package handler
 
 import (
-	dto2 "AnbariAPI/catalog/dto"
+	"AnbariAPI/Internal/catalog/domain"
+	"AnbariAPI/Internal/catalog/dto"
 	"AnbariAPI/shared/database"
-	"AnbariAPI/shared/models"
 	"net/http"
 	"strconv"
 
@@ -12,9 +12,9 @@ import (
 )
 
 func CreateProduct(c *gin.Context) {
-	var req dto2.ProductCreateRequest
+	var req dto.ProductCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto2.ErrorResponse{
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error:   "validation_error",
 			Message: err.Error(),
 		})
@@ -22,23 +22,23 @@ func CreateProduct(c *gin.Context) {
 	}
 
 	db := database.GetDB()
-	var category models.Category
+	var category domain.Category
 	if err := db.First(&category, req.CategoryID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusBadRequest, dto2.ErrorResponse{
+			c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 				Error:   "validation_error",
 				Message: "Category not found",
 			})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, dto2.ErrorResponse{
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "database_error",
 			Message: "Failed to validate category",
 		})
 		return
 	}
 
-	product := models.Product{
+	product := domain.Product{
 		CategoryID:   req.CategoryID,
 		Name:         req.Name,
 		Attribute:    req.Attribute,
@@ -50,7 +50,7 @@ func CreateProduct(c *gin.Context) {
 	}
 
 	if err := db.Create(&product).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, dto2.ErrorResponse{
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "database_error",
 			Message: "Failed to create product",
 		})
@@ -59,10 +59,10 @@ func CreateProduct(c *gin.Context) {
 
 	db.Preload("Category").First(&product, product.ID)
 
-	c.JSON(http.StatusCreated, dto2.ProductResponse{
+	c.JSON(http.StatusCreated, dto.ProductResponse{
 		ID:           product.ID,
 		CategoryID:   product.CategoryID,
-		Category:     dto2.CategoryResponse{ID: product.Category.ID, Name: product.Category.Name},
+		Category:     dto.CategoryResponse{ID: product.Category.ID, Name: product.Category.Name},
 		Name:         product.Name,
 		Attribute:    product.Attribute,
 		Unit:         product.Unit,
@@ -81,7 +81,7 @@ func GetProduct(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, dto2.ErrorResponse{
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error:   "validation_error",
 			Message: "Invalid product ID",
 		})
@@ -89,26 +89,26 @@ func GetProduct(c *gin.Context) {
 	}
 
 	db := database.GetDB()
-	var product models.Product
+	var product domain.Product
 	if err := db.Preload("Category").First(&product, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, dto2.ErrorResponse{
+			c.JSON(http.StatusNotFound, dto.ErrorResponse{
 				Error:   "not_found",
 				Message: "Product not found",
 			})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, dto2.ErrorResponse{
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "database_error",
 			Message: "Failed to fetch product",
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, dto2.ProductResponse{
+	c.JSON(http.StatusOK, dto.ProductResponse{
 		ID:           product.ID,
 		CategoryID:   product.CategoryID,
-		Category:     dto2.CategoryResponse{ID: product.Category.ID, Name: product.Category.Name},
+		Category:     dto.CategoryResponse{ID: product.Category.ID, Name: product.Category.Name},
 		Name:         product.Name,
 		Attribute:    product.Attribute,
 		Unit:         product.Unit,
@@ -125,11 +125,11 @@ func GetProduct(c *gin.Context) {
 
 func ListProducts(c *gin.Context) {
 	db := database.GetDB()
-	var products []models.Product
+	var products []domain.Product
 	var total int64
 
-	if err := db.Model(&models.Product{}).Count(&total).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, dto2.ErrorResponse{
+	if err := db.Model(&domain.Product{}).Count(&total).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "database_error",
 			Message: "Failed to fetch products",
 		})
@@ -137,19 +137,19 @@ func ListProducts(c *gin.Context) {
 	}
 
 	if err := db.Preload("Category").Find(&products).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, dto2.ErrorResponse{
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "database_error",
 			Message: "Failed to fetch products",
 		})
 		return
 	}
 
-	responses := make([]dto2.ProductResponse, len(products))
+	responses := make([]dto.ProductResponse, len(products))
 	for i, p := range products {
-		responses[i] = dto2.ProductResponse{
+		responses[i] = dto.ProductResponse{
 			ID:           p.ID,
 			CategoryID:   p.CategoryID,
-			Category:     dto2.CategoryResponse{ID: p.Category.ID, Name: p.Category.Name},
+			Category:     dto.CategoryResponse{ID: p.Category.ID, Name: p.Category.Name},
 			Name:         p.Name,
 			Attribute:    p.Attribute,
 			Unit:         p.Unit,
@@ -164,7 +164,7 @@ func ListProducts(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, dto2.ProductListResponse{
+	c.JSON(http.StatusOK, dto.ProductListResponse{
 		Products: responses,
 		Total:    total,
 	})
@@ -174,7 +174,7 @@ func DeleteProduct(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, dto2.ErrorResponse{
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error:   "validation_error",
 			Message: "Invalid product ID",
 		})
@@ -182,9 +182,9 @@ func DeleteProduct(c *gin.Context) {
 	}
 
 	db := database.GetDB()
-	result := db.Delete(&models.Product{}, id)
+	result := db.Delete(&domain.Product{}, id)
 	if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, dto2.ErrorResponse{
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "database_error",
 			Message: "Failed to delete product",
 		})
@@ -192,14 +192,14 @@ func DeleteProduct(c *gin.Context) {
 	}
 
 	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, dto2.ErrorResponse{
+		c.JSON(http.StatusNotFound, dto.ErrorResponse{
 			Error:   "not_found",
 			Message: "Product not found",
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, dto2.SuccessResponse{
+	c.JSON(http.StatusOK, dto.SuccessResponse{
 		Message: "Product deleted successfully",
 	})
 }

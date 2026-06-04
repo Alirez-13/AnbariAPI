@@ -2,12 +2,12 @@ package service
 
 import (
 	"AnbariAPI/Internal/Inventory"
+	domain2 "AnbariAPI/Internal/Inventory/domain"
 	"AnbariAPI/Internal/Inventory/dto"
 	"AnbariAPI/Internal/Inventory/mapper"
 	"AnbariAPI/Internal/Inventory/repository"
 	"AnbariAPI/Internal/Inventory/resolver"
-	"AnbariAPI/shared/models"
-
+	"AnbariAPI/Internal/catalog/domain"
 	"context"
 	"fmt"
 
@@ -48,7 +48,7 @@ func (s *inventoryServiceImpl) ProcessEntry(ctx context.Context, req dto.EntryRe
 	var transactionID uint
 
 	err := s.repo.DoInTransaction(ctx, func(txRepo repository.Repository) error {
-		transaction := models.Transaction{
+		transaction := domain2.Transaction{
 			TransactionType: TransactionTypeEntry,
 			Reference:       req.Reference,
 			Date:            req.Date,
@@ -61,7 +61,7 @@ func (s *inventoryServiceImpl) ProcessEntry(ctx context.Context, req dto.EntryRe
 		productDeltas := make(map[uint]decimal.Decimal)
 
 		// Caches to prevent N+1 reads
-		productCache := make(map[uint]*models.Product)
+		productCache := make(map[uint]*domain.Product)
 		unitCache := make(map[string]decimal.Decimal)
 
 		for _, line := range req.Lines {
@@ -90,7 +90,7 @@ func (s *inventoryServiceImpl) ProcessEntry(ctx context.Context, req dto.EntryRe
 			baseUnitPrice := line.InputUnitPrice.Div(multiplier)
 			totalPrice := baseQuantity.Mul(baseUnitPrice)
 
-			detail := models.TransactionDetail{
+			detail := domain2.TransactionDetail{
 				TransactionID:  transaction.ID,
 				ProductID:      line.ProductID,
 				UnitName:       line.UnitName,
@@ -106,7 +106,7 @@ func (s *inventoryServiceImpl) ProcessEntry(ctx context.Context, req dto.EntryRe
 				return fmt.Errorf("failed to create detail for product %d: %w", line.ProductID, err)
 			}
 
-			batch := models.InventoryBatch{
+			batch := domain2.InventoryBatch{
 				ProductID:             line.ProductID,
 				EntryDetailID:         detail.ID,
 				EntryUnitName:         line.UnitName,
@@ -185,7 +185,7 @@ func (s *inventoryServiceImpl) ConfirmExit(ctx context.Context, req dto.ExitRequ
 			return err
 		}
 
-		transaction := models.Transaction{
+		transaction := domain2.Transaction{
 			TransactionType: TransactionTypeExit,
 			Reference:       req.Reference,
 			Date:            req.Date,
@@ -200,7 +200,7 @@ func (s *inventoryServiceImpl) ConfirmExit(ctx context.Context, req dto.ExitRequ
 
 		for i, r := range resolved {
 			batchID := r.Batch.ID
-			detail := models.TransactionDetail{
+			detail := domain2.TransactionDetail{
 				TransactionID:    transaction.ID,
 				ProductID:        r.Product.ID,
 				InventoryBatchID: &batchID,

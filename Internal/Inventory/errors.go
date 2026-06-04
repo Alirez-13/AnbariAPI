@@ -1,4 +1,4 @@
-// Package Inventory provides domain logic, models, and repositories for managing stock.
+// Package Inventory provides domain logic, domain, and repositories for managing stock.
 package Inventory
 
 import "errors"

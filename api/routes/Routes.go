@@ -6,7 +6,7 @@ import (
 	"AnbariAPI/Internal/Inventory/resolver"
 	"AnbariAPI/Internal/Inventory/service"
 	handler3 "AnbariAPI/Internal/auth/handler"
-	handler4 "AnbariAPI/catalog/handler"
+	"AnbariAPI/Internal/catalog/handler"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -26,18 +26,18 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, authHandler *handler3.AuthHandler) 
 		categories := v1.Group("/categories")
 		{
 			// Note: Consider injecting handlers here in the future instead of using package-level functions.
-			categories.POST("", handler4.CreateCategory)
-			categories.GET("", handler4.ListCategories)
-			categories.GET("/:id", handler4.GetCategory)
-			categories.DELETE("/:id", handler4.DeleteCategory)
+			categories.POST("", handler.CreateCategory)
+			categories.GET("", handler.ListCategories)
+			categories.GET("/:id", handler.GetCategory)
+			categories.DELETE("/:id", handler.DeleteCategory)
 		}
 
 		products := v1.Group("/products")
 		{
-			products.POST("", handler4.CreateProduct)
-			products.GET("", handler4.ListProducts)
-			products.GET("/:id", handler4.GetProduct)
-			products.DELETE("/:id", handler4.DeleteProduct)
+			products.POST("", handler.CreateProduct)
+			products.GET("", handler.ListProducts)
+			products.GET("/:id", handler.GetProduct)
+			products.DELETE("/:id", handler.DeleteProduct)
 		}
 
 		// Dependency Injection: Wire up the Inventory bounded context

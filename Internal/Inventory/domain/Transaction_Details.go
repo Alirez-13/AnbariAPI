@@ -1,4 +1,4 @@
-package models
+package domain
 
 import (
 	"github.com/shopspring/decimal"
@@ -16,10 +16,10 @@ import (
 //
 // ──────────────────────────────────────────────
 type TransactionDetail struct {
-	ID               uint            `gorm:"primaryKey" json:"id"`
-	TransactionID    uint            `gorm:"not null;index" json:"transaction_id"`
-	ProductID        uint            `gorm:"not null;index" json:"product_id"`
-	Product          Product         `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+	ID            uint `gorm:"primaryKey" json:"id"`
+	TransactionID uint `gorm:"not null;index" json:"transaction_id"`
+	ProductID     uint `gorm:"not null;index" json:"product_id"`
+	//Product          domain.Product  `gorm:"foreignKey:ProductID" json:"product,omitempty"`
 	InventoryBatchID *uint           `gorm:"index" json:"inventory_batch_id,omitempty"` // NULL for IN, required for OUT
 	InventoryBatch   *InventoryBatch `gorm:"foreignKey:InventoryBatchID" json:"inventory_batch,omitempty"`
 

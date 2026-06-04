@@ -1,8 +1,8 @@
 package service
 
 import (
+	"AnbariAPI/Internal/auth/domain"
 	"AnbariAPI/Internal/auth/dto"
-	"AnbariAPI/Internal/auth/models"
 	"AnbariAPI/Internal/auth/repository"
 	"AnbariAPI/Internal/auth/service/utils"
 	"errors"
@@ -66,7 +66,7 @@ func (s *authService) Register(req dto.RegisterRequest) (*dto.AuthResponse, erro
 		return nil, fmt.Errorf("register: hash password: %w", err)
 	}
 
-	user := &models.User{
+	user := &domain.User{
 		Email:    req.Email,
 		Phone:    req.Phone,
 		Password: hashedPassword,
@@ -120,7 +120,7 @@ func (s *authService) Logout(sessionID uuid.UUID) error {
 	return nil
 }
 
-func (s *authService) ValidateSession(sessionID uuid.UUID) (*models.User, error) {
+func (s *authService) ValidateSession(sessionID uuid.UUID) (*domain.User, error) {
 	session, err := s.sessionRepository.FindByID(sessionID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -150,8 +150,8 @@ func (s *authService) ValidateSession(sessionID uuid.UUID) (*models.User, error)
 	return user, nil
 }
 
-func (s *authService) createSession(userID uint) (*models.Session, error) {
-	session := &models.Session{
+func (s *authService) createSession(userID uint) (*domain.Session, error) {
+	session := &domain.Session{
 		UserID:    userID,
 		ExpiresAt: time.Now().Add(SessionDuration),
 		IsActive:  true,
@@ -164,7 +164,7 @@ func (s *authService) createSession(userID uint) (*models.Session, error) {
 	return session, nil
 }
 
-func (s *authService) buildAuthResponse(user *models.User, session *models.Session) *dto.AuthResponse {
+func (s *authService) buildAuthResponse(user *domain.User, session *domain.Session) *dto.AuthResponse {
 	return &dto.AuthResponse{
 		User: dto.UserDTO{
 			ID:        user.ID,

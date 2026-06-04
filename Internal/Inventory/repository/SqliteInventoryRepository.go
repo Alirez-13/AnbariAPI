@@ -2,7 +2,8 @@ package repository
 
 import (
 	"AnbariAPI/Internal/Inventory"
-	"AnbariAPI/shared/models"
+	domain2 "AnbariAPI/Internal/Inventory/domain"
+	"AnbariAPI/Internal/catalog/domain"
 	"context"
 	"errors"
 	"fmt"
@@ -27,8 +28,8 @@ func (r *repository) DoInTransaction(ctx context.Context, fn func(txRepo Reposit
 	})
 }
 
-func (r *repository) GetProduct(ctx context.Context, id uint) (*models.Product, error) {
-	var p models.Product
+func (r *repository) GetProduct(ctx context.Context, id uint) (*domain.Product, error) {
+	var p domain.Product
 	if err := r.db.WithContext(ctx).First(&p, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("%w: ID %d", Inventory.ErrProductNotFound, id)
@@ -38,8 +39,8 @@ func (r *repository) GetProduct(ctx context.Context, id uint) (*models.Product, 
 	return &p, nil
 }
 
-func (r *repository) GetBatch(ctx context.Context, id uint) (*models.InventoryBatch, error) {
-	var b models.InventoryBatch
+func (r *repository) GetBatch(ctx context.Context, id uint) (*domain2.InventoryBatch, error) {
+	var b domain2.InventoryBatch
 	if err := r.db.WithContext(ctx).First(&b, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("%w: ID %d", Inventory.ErrBatchNotFound, id)
@@ -49,8 +50,8 @@ func (r *repository) GetBatch(ctx context.Context, id uint) (*models.InventoryBa
 	return &b, nil
 }
 
-func (r *repository) GetBatchForUpdate(ctx context.Context, id uint) (*models.InventoryBatch, error) {
-	var b models.InventoryBatch
+func (r *repository) GetBatchForUpdate(ctx context.Context, id uint) (*domain2.InventoryBatch, error) {
+	var b domain2.InventoryBatch
 	if err := r.db.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).First(&b, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("%w: ID %d", Inventory.ErrBatchNotFound, id)
@@ -60,8 +61,8 @@ func (r *repository) GetBatchForUpdate(ctx context.Context, id uint) (*models.In
 	return &b, nil
 }
 
-func (r *repository) GetProductUnit(ctx context.Context, productID uint, unitName string) (*models.ProductUnit, error) {
-	var pu models.ProductUnit
+func (r *repository) GetProductUnit(ctx context.Context, productID uint, unitName string) (*domain.ProductUnit, error) {
+	var pu domain.ProductUnit
 	if err := r.db.WithContext(ctx).
 		Where("product_id = ? AND unit_name = ?", productID, unitName).
 		First(&pu).Error; err != nil {
@@ -73,8 +74,8 @@ func (r *repository) GetProductUnit(ctx context.Context, productID uint, unitNam
 	return &pu, nil
 }
 
-func (r *repository) GetAvailableBatches(ctx context.Context, productID uint) ([]models.InventoryBatch, error) {
-	var batches []models.InventoryBatch
+func (r *repository) GetAvailableBatches(ctx context.Context, productID uint) ([]domain2.InventoryBatch, error) {
+	var batches []domain2.InventoryBatch
 	if err := r.db.WithContext(ctx).
 		Where("product_id = ? AND remaining_base_quantity > 0", productID).
 		Order("entry_date ASC, id ASC").
@@ -84,8 +85,8 @@ func (r *repository) GetAvailableBatches(ctx context.Context, productID uint) ([
 	return batches, nil
 }
 
-func (r *repository) GetTransactionWithDetails(ctx context.Context, transactionID uint) (*models.Transaction, error) {
-	var txn models.Transaction
+func (r *repository) GetTransactionWithDetails(ctx context.Context, transactionID uint) (*domain2.Transaction, error) {
+	var txn domain2.Transaction
 	if err := r.db.WithContext(ctx).
 		Preload("Details.Product").
 		Preload("Details.InventoryBatch").
@@ -98,21 +99,21 @@ func (r *repository) GetTransactionWithDetails(ctx context.Context, transactionI
 	return &txn, nil
 }
 
-func (r *repository) CreateTransaction(ctx context.Context, txn *models.Transaction) error {
+func (r *repository) CreateTransaction(ctx context.Context, txn *domain2.Transaction) error {
 	if err := r.db.WithContext(ctx).Create(txn).Error; err != nil {
 		return fmt.Errorf("create transaction error: %w", err)
 	}
 	return nil
 }
 
-func (r *repository) CreateTransactionDetail(ctx context.Context, detail *models.TransactionDetail) error {
+func (r *repository) CreateTransactionDetail(ctx context.Context, detail *domain2.TransactionDetail) error {
 	if err := r.db.WithContext(ctx).Create(detail).Error; err != nil {
 		return fmt.Errorf("create transaction detail for product %d: %w", detail.ProductID, err)
 	}
 	return nil
 }
 
-func (r *repository) CreateInventoryBatch(ctx context.Context, batch *models.InventoryBatch) error {
+func (r *repository) CreateInventoryBatch(ctx context.Context, batch *domain2.InventoryBatch) error {
 	if err := r.db.WithContext(ctx).Create(batch).Error; err != nil {
 		return fmt.Errorf("create inventory batch for product %d: %w", batch.ProductID, err)
 	}
@@ -121,7 +122,7 @@ func (r *repository) CreateInventoryBatch(ctx context.Context, batch *models.Inv
 
 func (r *repository) UpdateProductStock(ctx context.Context, productID uint, delta decimal.Decimal) error {
 	result := r.db.WithContext(ctx).
-		Model(&models.Product{}).
+		Model(&domain.Product{}).
 		Where("id = ?", productID).
 		UpdateColumn("current_stock", gorm.Expr("current_stock + ?", delta))
 
@@ -133,7 +134,7 @@ func (r *repository) UpdateProductStock(ctx context.Context, productID uint, del
 
 func (r *repository) DeductBatchStock(ctx context.Context, batchID uint, amount decimal.Decimal) (int64, error) {
 	result := r.db.WithContext(ctx).
-		Model(&models.InventoryBatch{}).
+		Model(&domain2.InventoryBatch{}).
 		Where("id = ? AND remaining_base_quantity >= ?", batchID, amount).
 		UpdateColumn("remaining_base_quantity", gorm.Expr("remaining_base_quantity - ?", amount))
 

@@ -1,9 +1,9 @@
 package handler
 
 import (
-	"AnbariAPI/catalog/dto"
+	"AnbariAPI/Internal/catalog/domain"
+	dto2 "AnbariAPI/Internal/catalog/dto"
 	"AnbariAPI/shared/database"
-	"AnbariAPI/shared/models"
 	"errors"
 	"net/http"
 	"strconv"
@@ -13,29 +13,29 @@ import (
 )
 
 func CreateCategory(c *gin.Context) {
-	var req dto.CategoryCreateRequest
+	var req dto2.CategoryCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+		c.JSON(http.StatusBadRequest, dto2.ErrorResponse{
 			Error:   "validation_error",
 			Message: err.Error(),
 		})
 		return
 	}
 
-	category := models.Category{
+	category := domain.Category{
 		Name: req.Name,
 	}
 
 	db := database.GetDB()
 	if err := db.Create(&category).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+		c.JSON(http.StatusInternalServerError, dto2.ErrorResponse{
 			Error:   "database_error",
 			Message: "Failed to create category",
 		})
 		return
 	}
 
-	c.JSON(http.StatusCreated, dto.CategoryResponse{
+	c.JSON(http.StatusCreated, dto2.CategoryResponse{
 		ID:        category.ID,
 		Name:      category.Name,
 		CreatedAt: category.CreatedAt,
@@ -47,7 +47,7 @@ func GetCategory(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+		c.JSON(http.StatusBadRequest, dto2.ErrorResponse{
 			Error:   "validation_error",
 			Message: "Invalid category ID",
 		})
@@ -55,25 +55,25 @@ func GetCategory(c *gin.Context) {
 	}
 
 	db := database.GetDB()
-	var category models.Category
+	var category domain.Category
 	if err := db.Preload("Products").First(&category, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, dto.ErrorResponse{
+			c.JSON(http.StatusNotFound, dto2.ErrorResponse{
 				Error:   "not_found",
 				Message: "Category not found",
 			})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+		c.JSON(http.StatusInternalServerError, dto2.ErrorResponse{
 			Error:   "database_error",
 			Message: "Failed to fetch category",
 		})
 		return
 	}
 
-	products := make([]dto.ProductResponse, len(category.Products))
+	products := make([]dto2.ProductResponse, len(category.Products))
 	for i, p := range category.Products {
-		products[i] = dto.ProductResponse{
+		products[i] = dto2.ProductResponse{
 			ID:           p.ID,
 			CategoryID:   p.CategoryID,
 			Name:         p.Name,
@@ -99,11 +99,11 @@ func GetCategory(c *gin.Context) {
 
 func ListCategories(c *gin.Context) {
 	db := database.GetDB()
-	var categories []models.Category
+	var categories []domain.Category
 	var total int64
 
-	if err := db.Model(&models.Category{}).Count(&total).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+	if err := db.Model(&domain.Category{}).Count(&total).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, dto2.ErrorResponse{
 			Error:   "database_error",
 			Message: "Failed to fetch categories",
 		})
@@ -111,16 +111,16 @@ func ListCategories(c *gin.Context) {
 	}
 
 	if err := db.Preload("Products").Find(&categories).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+		c.JSON(http.StatusInternalServerError, dto2.ErrorResponse{
 			Error:   "database_error",
 			Message: "Failed to fetch categories",
 		})
 		return
 	}
 
-	responses := make([]dto.CategoryResponse, len(categories))
+	responses := make([]dto2.CategoryResponse, len(categories))
 	for i, cat := range categories {
-		responses[i] = dto.CategoryResponse{
+		responses[i] = dto2.CategoryResponse{
 			ID:        cat.ID,
 			Name:      cat.Name,
 			CreatedAt: cat.CreatedAt,
@@ -128,7 +128,7 @@ func ListCategories(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, dto.CategoryListResponse{
+	c.JSON(http.StatusOK, dto2.CategoryListResponse{
 		Categories: responses,
 		Total:      total,
 	})
@@ -138,7 +138,7 @@ func DeleteCategory(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+		c.JSON(http.StatusBadRequest, dto2.ErrorResponse{
 			Error:   "validation_error",
 			Message: "Invalid category ID",
 		})
@@ -146,9 +146,9 @@ func DeleteCategory(c *gin.Context) {
 	}
 
 	db := database.GetDB()
-	result := db.Delete(&models.Category{}, id)
+	result := db.Delete(&domain.Category{}, id)
 	if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+		c.JSON(http.StatusInternalServerError, dto2.ErrorResponse{
 			Error:   "database_error",
 			Message: "Failed to delete category",
 		})
@@ -156,14 +156,14 @@ func DeleteCategory(c *gin.Context) {
 	}
 
 	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, dto.ErrorResponse{
+		c.JSON(http.StatusNotFound, dto2.ErrorResponse{
 			Error:   "not_found",
 			Message: "Category not found",
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.SuccessResponse{
+	c.JSON(http.StatusOK, dto2.SuccessResponse{
 		Message: "Category deleted successfully",
 	})
 }

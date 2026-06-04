@@ -1,13 +1,13 @@
 package repository
 
 import (
-	"AnbariAPI/Internal/auth/models"
+	"AnbariAPI/Internal/auth/domain"
 )
 
 type UserRepository interface {
-	Create(user *models.User) error
-	FindByEmail(email string) (*models.User, error)
-	FindByPhone(phone string) (*models.User, error)
-	FindByID(id uint) (*models.User, error)
-	Update(user *models.User) error
+	Create(user *domain.User) error
+	FindByEmail(email string) (*domain.User, error)
+	FindByPhone(phone string) (*domain.User, error)
+	FindByID(id uint) (*domain.User, error)
+	Update(user *domain.User) error
 }
