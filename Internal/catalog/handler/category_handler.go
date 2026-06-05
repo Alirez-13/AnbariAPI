@@ -74,17 +74,11 @@ func GetCategory(c *gin.Context) {
 	products := make([]dto2.ProductResponse, len(category.Products))
 	for i, p := range category.Products {
 		products[i] = dto2.ProductResponse{
-			ID:           p.ID,
-			CategoryID:   p.CategoryID,
-			Name:         p.Name,
-			Attribute:    p.Attribute,
-			Unit:         p.Unit,
-			PackSize:     p.PackSize,
-			IsPackable:   p.IsPackable,
-			BaseUnit:     p.BaseUnit,
-			CurrentStock: p.CurrentStock,
-			DisplayStock: p.DisplayStock,
-			DisplayUnit:  p.DisplayUnit,
+			ID:         p.ID,
+			CategoryID: p.CategoryID,
+			Name:       p.Name,
+			Attribute:  p.Attribute,
+			PackSize:   p.PackSize,
 		}
 	}
 

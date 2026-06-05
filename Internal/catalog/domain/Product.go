@@ -11,12 +11,8 @@ type Product struct {
 	CategoryID uint     `gorm:"not null;index" json:"category_id"`
 	Category   Category `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
 	Name       string   `gorm:"size:200;not null;index" json:"name"`
-	BaseUnit   string   `gorm:"size:50;not null" json:"base_unit"`
-	// Because of Modular Design Deleted (CurrentStock, Batches)
-	//CurrentStock decimal.Decimal `gorm:"type:numeric(15,4);default:0;not null" json:"current_stock"`
-
-	Units []ProductUnit `gorm:"foreignKey:ProductID" json:"units,omitempty"`
-	//Batches []models.InventoryBatch `gorm:"foreignKey:ProductID" json:"batches,omitempty"`
+	Attribute  string   `gorm:"size:100" json:"attribute"`
+	PackSize   float64  `gorm:"type:numeric(15,4);default:1;not null" json:"pack_size"`
 
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`

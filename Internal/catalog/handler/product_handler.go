@@ -39,14 +39,10 @@ func CreateProduct(c *gin.Context) {
 	}
 
 	product := domain.Product{
-		CategoryID:   req.CategoryID,
-		Name:         req.Name,
-		Attribute:    req.Attribute,
-		Unit:         req.Unit,
-		PackSize:     req.PackSize,
-		IsPackable:   req.IsPackable,
-		BaseUnit:     req.BaseUnit,
-		CurrentStock: req.CurrentStock,
+		CategoryID: req.CategoryID,
+		Name:       req.Name,
+		Attribute:  req.Attribute,
+		PackSize:   req.PackSize,
 	}
 
 	if err := db.Create(&product).Error; err != nil {
@@ -60,20 +56,14 @@ func CreateProduct(c *gin.Context) {
 	db.Preload("Category").First(&product, product.ID)
 
 	c.JSON(http.StatusCreated, dto.ProductResponse{
-		ID:           product.ID,
-		CategoryID:   product.CategoryID,
-		Category:     dto.CategoryResponse{ID: product.Category.ID, Name: product.Category.Name},
-		Name:         product.Name,
-		Attribute:    product.Attribute,
-		Unit:         product.Unit,
-		PackSize:     product.PackSize,
-		IsPackable:   product.IsPackable,
-		BaseUnit:     product.BaseUnit,
-		CurrentStock: product.CurrentStock,
-		DisplayStock: product.DisplayStock,
-		DisplayUnit:  product.DisplayUnit,
-		CreatedAt:    product.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:    product.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		ID:         product.ID,
+		CategoryID: product.CategoryID,
+		Category:   dto.CategoryResponse{ID: product.Category.ID, Name: product.Category.Name},
+		Name:       product.Name,
+		Attribute:  product.Attribute,
+		PackSize:   product.PackSize,
+		CreatedAt:  product.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:  product.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	})
 }
 
@@ -106,20 +96,14 @@ func GetProduct(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.ProductResponse{
-		ID:           product.ID,
-		CategoryID:   product.CategoryID,
-		Category:     dto.CategoryResponse{ID: product.Category.ID, Name: product.Category.Name},
-		Name:         product.Name,
-		Attribute:    product.Attribute,
-		Unit:         product.Unit,
-		PackSize:     product.PackSize,
-		IsPackable:   product.IsPackable,
-		BaseUnit:     product.BaseUnit,
-		CurrentStock: product.CurrentStock,
-		DisplayStock: product.DisplayStock,
-		DisplayUnit:  product.DisplayUnit,
-		CreatedAt:    product.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:    product.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		ID:         product.ID,
+		CategoryID: product.CategoryID,
+		Category:   dto.CategoryResponse{ID: product.Category.ID, Name: product.Category.Name},
+		Name:       product.Name,
+		Attribute:  product.Attribute,
+		PackSize:   product.PackSize,
+		CreatedAt:  product.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:  product.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	})
 }
 
@@ -147,20 +131,14 @@ func ListProducts(c *gin.Context) {
 	responses := make([]dto.ProductResponse, len(products))
 	for i, p := range products {
 		responses[i] = dto.ProductResponse{
-			ID:           p.ID,
-			CategoryID:   p.CategoryID,
-			Category:     dto.CategoryResponse{ID: p.Category.ID, Name: p.Category.Name},
-			Name:         p.Name,
-			Attribute:    p.Attribute,
-			Unit:         p.Unit,
-			PackSize:     p.PackSize,
-			IsPackable:   p.IsPackable,
-			BaseUnit:     p.BaseUnit,
-			CurrentStock: p.CurrentStock,
-			DisplayStock: p.DisplayStock,
-			DisplayUnit:  p.DisplayUnit,
-			CreatedAt:    p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt:    p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			ID:         p.ID,
+			CategoryID: p.CategoryID,
+			Category:   dto.CategoryResponse{ID: p.Category.ID, Name: p.Category.Name},
+			Name:       p.Name,
+			Attribute:  p.Attribute,
+			PackSize:   p.PackSize,
+			CreatedAt:  p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			UpdatedAt:  p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 	}
 
