@@ -2,6 +2,7 @@ package handler
 
 import (
 	"AnbariAPI/Internal/auth/dto"
+	"AnbariAPI/Internal/auth/middleware"
 	"AnbariAPI/Internal/auth/service"
 	"net/http"
 
@@ -10,11 +11,12 @@ import (
 )
 
 type AuthHandler struct {
-	authService service.AuthService
+	authService    service.AuthService
+	sessionManager *middleware.SessionManager
 }
 
-func NewAuthHandler(authService service.AuthService) *AuthHandler {
-	return &AuthHandler{authService: authService}
+func NewAuthHandler(authService service.AuthService, sessionManager *middleware.SessionManager) *AuthHandler {
+	return &AuthHandler{authService: authService, sessionManager: sessionManager}
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
@@ -27,6 +29,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	response, err := h.authService.Register(req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.sessionManager.Create(c, response.SessionID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session cookie"})
 		return
 	}
 
@@ -45,12 +51,23 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
+	if err := h.sessionManager.Create(c, response.SessionID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session cookie"})
+		return
+	}
 
 	c.JSON(http.StatusOK, response)
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
-	sessionIDStr := c.GetHeader("X-Session-ID")
+	sessionIDStr, err := h.sessionManager.SessionID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid session cookie"})
+		return
+	}
+	if sessionIDStr == "" {
+		sessionIDStr = c.GetHeader("X-Session-ID")
+	}
 	if sessionIDStr == "" {
 		sessionIDStr = c.Query("session_id")
 	}
@@ -68,6 +85,10 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 
 	if err := h.authService.Logout(sessionID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to logout"})
+		return
+	}
+	if err := h.sessionManager.Destroy(c); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to destroy session cookie"})
 		return
 	}
 

@@ -13,7 +13,6 @@ type Repository interface {
 	GetProduct(ctx context.Context, id uint) (*domain.Product, error)
 	GetBatch(ctx context.Context, id uint) (*domain2.InventoryBatch, error)
 	GetBatchForUpdate(ctx context.Context, id uint) (*domain2.InventoryBatch, error)
-	GetProductUnit(ctx context.Context, productID uint, unitName string) (*domain.ProductUnit, error)
 	GetAvailableBatches(ctx context.Context, productID uint) ([]domain2.InventoryBatch, error)
 	GetTransactionWithDetails(ctx context.Context, transactionID uint) (*domain2.Transaction, error)
 

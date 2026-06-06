@@ -61,19 +61,6 @@ func (r *repository) GetBatchForUpdate(ctx context.Context, id uint) (*domain2.I
 	return &b, nil
 }
 
-func (r *repository) GetProductUnit(ctx context.Context, productID uint, unitName string) (*domain.ProductUnit, error) {
-	var pu domain.ProductUnit
-	if err := r.db.WithContext(ctx).
-		Where("product_id = ? AND unit_name = ?", productID, unitName).
-		First(&pu).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("%w: %q for product %d", Inventory.ErrInvalidUnit, unitName, productID)
-		}
-		return nil, fmt.Errorf("failed to get product unit %q for product %d: %w", unitName, productID, err)
-	}
-	return &pu, nil
-}
-
 func (r *repository) GetAvailableBatches(ctx context.Context, productID uint) ([]domain2.InventoryBatch, error) {
 	var batches []domain2.InventoryBatch
 	if err := r.db.WithContext(ctx).
