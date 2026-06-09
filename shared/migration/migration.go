@@ -1,9 +1,9 @@
 package migration
 
 import (
-	domain2 "AnbariAPI/Internal/Inventory/domain"
-	models3 "AnbariAPI/Internal/auth/domain"
-	"AnbariAPI/Internal/catalog/domain"
+	models3 "AnbariAPI/internal/auth/domain"
+	"AnbariAPI/internal/catalog/domain"
+	domain2 "AnbariAPI/internal/inventory/domain"
 	"log"
 
 	"gorm.io/gorm"
@@ -18,7 +18,9 @@ func Migrate(db *gorm.DB) error {
 		&domain.Category{},
 		&domain.Product{},
 		&domain2.Transaction{},
-		&domain2.TransactionDetail{},
+		&domain2.TransactionLine{},
+		&domain2.InventoryBatch{},
+		&domain2.BatchAllocation{},
 		&models3.User{},    // ADDED User
 		&models3.Session{}, // ADDED Session
 	)
@@ -35,10 +37,10 @@ func Migrate(db *gorm.DB) error {
 	}{
 		{"products", "idx_product_category", "category_id"},
 		{"products", "idx_product_name", "name"},
-		{"transactions", "idx_transaction_type", "transaction_type"},
+		{"transactions", "idx_transaction_type", "type"},
 		{"transactions", "idx_transaction_date", "date"},
-		{"transaction_details", "idx_detail_transaction", "transaction_id"},
-		{"transaction_details", "idx_detail_product", "product_id"},
+		{"transaction_lines", "idx_line_transaction", "transaction_id"},
+		{"transaction_lines", "idx_line_product", "product_id"},
 	}
 
 	for _, idx := range indexes {

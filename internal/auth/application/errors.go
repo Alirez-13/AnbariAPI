@@ -1,0 +1,13 @@
+// # SINGLE REASON: Define auth application errors.
+package application
+
+import "errors"
+
+var (
+	ErrEmailAlreadyRegistered = errors.New("email already registered")
+	ErrPhoneAlreadyRegistered = errors.New("phone already registered")
+	ErrInvalidCredentials     = errors.New("invalid credentials")
+	ErrSessionNotFound        = errors.New("session not found")
+	ErrSessionExpired         = errors.New("session expired")
+	ErrUserNotFound           = errors.New("user not found")
+)

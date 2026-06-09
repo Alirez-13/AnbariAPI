@@ -1,12 +1,12 @@
 package routes
 
 import (
-	handler2 "AnbariAPI/Internal/Inventory/handler"
-	"AnbariAPI/Internal/Inventory/repository"
-	"AnbariAPI/Internal/Inventory/resolver"
-	"AnbariAPI/Internal/Inventory/service"
-	handler3 "AnbariAPI/Internal/auth/handler"
-	"AnbariAPI/Internal/catalog/handler"
+	handler3 "AnbariAPI/internal/auth/handler"
+	"AnbariAPI/internal/catalog/handler"
+	//handler2 "AnbariAPI/internal/inventory/handler"
+	//"AnbariAPI/internal/inventory/repository"
+	//"AnbariAPI/internal/inventory/resolver"
+	//"AnbariAPI/internal/inventory/service"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -40,21 +40,21 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, authHandler *handler3.AuthHandler) 
 			products.DELETE("/:id", handler.DeleteProduct)
 		}
 
-		// Dependency Injection: Wire up the Inventory bounded context
-		repo := repository.NewRepository(db)
-		resolver := resolver.NewExitResolver()
-		invSvc := service.NewInventoryService(repo, resolver)
-		invH := handler2.NewInventoryHandler(invSvc)
-
-		inventory := v1.Group("")
-		{
-			// Batch availability (for exit popup)
-			inventory.GET("/products/:productId/batches", invH.GetAvailableBatches)
-
-			// Transactions
-			inventory.POST("/transactions/entry", invH.ProcessEntry)
-			inventory.POST("/transactions/exit/preview", invH.PreviewExit)
-			inventory.POST("/transactions/exit", invH.ConfirmExit)
-		}
+		// Dependency Injection: Wire up the inventory bounded context
+		//repo := repository.NewRepository(db)
+		//resolver := resolver.NewExitResolver()
+		//invSvc := service.NewInventoryService(repo, resolver)
+		//invH := handler2.NewInventoryHandler(invSvc)
+		//
+		//inventory := v1.Group("")
+		//{
+		//	// Batch availability (for exit popup)
+		//	inventory.GET("/products/:productId/batches", invH.GetAvailableBatches)
+		//
+		//	// Transactions
+		//	inventory.POST("/transactions/entry", invH.ProcessEntry)
+		//	inventory.POST("/transactions/exit/preview", invH.PreviewExit)
+		//	inventory.POST("/transactions/exit", invH.ConfirmExit)
+		//}
 	}
 }

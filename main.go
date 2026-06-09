@@ -1,11 +1,11 @@
 package main
 
 import (
-	"AnbariAPI/Internal/auth/handler"
-	"AnbariAPI/Internal/auth/middleware"
-	"AnbariAPI/Internal/auth/repository"
-	"AnbariAPI/Internal/auth/service"
 	"AnbariAPI/api/routes"
+	"AnbariAPI/internal/auth/handler"
+	"AnbariAPI/internal/auth/middleware"
+	"AnbariAPI/internal/auth/repository"
+	"AnbariAPI/internal/auth/service"
 	corscfg "AnbariAPI/shared/config"
 	"AnbariAPI/shared/database"
 	"context"

@@ -1,3 +1,6 @@
 .rtk/
 shared/data/*
 opencode.json
+.opencode/*
+.opencode
+.opencode/
