@@ -1,7 +1,7 @@
 package routes
 
 import (
-	handler3 "AnbariAPI/internal/auth/handler"
+	authinterfaces "AnbariAPI/internal/auth/interfaces"
 	"AnbariAPI/internal/catalog/handler"
 	//handler2 "AnbariAPI/internal/inventory/handler"
 	//"AnbariAPI/internal/inventory/repository"
@@ -13,7 +13,7 @@ import (
 )
 
 // SetupRoutes registers all application routes.
-func SetupRoutes(r *gin.Engine, db *gorm.DB, authHandler *handler3.AuthHandler) {
+func SetupRoutes(r *gin.Engine, db *gorm.DB, authHandler *authinterfaces.AuthHandler) {
 	auth := r.Group("/auth")
 	{
 		auth.POST("/register", authHandler.Register)

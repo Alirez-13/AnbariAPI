@@ -2,10 +2,9 @@ package main
 
 import (
 	"AnbariAPI/api/routes"
-	"AnbariAPI/internal/auth/handler"
-	"AnbariAPI/internal/auth/middleware"
-	"AnbariAPI/internal/auth/repository"
-	"AnbariAPI/internal/auth/service"
+	"AnbariAPI/internal/auth/application"
+	"AnbariAPI/internal/auth/infrastructure"
+	authinterfaces "AnbariAPI/internal/auth/interfaces"
 	corscfg "AnbariAPI/shared/config"
 	"AnbariAPI/shared/database"
 	"context"
@@ -85,11 +84,12 @@ func run(logger *slog.Logger) error {
 
 	db := database.GetDB()
 
-	userRepo := repository.NewUserRepository(db)
-	sessionRepo := repository.NewSessionRepository(db)
-	authService := service.NewAuthService(userRepo, sessionRepo, logger)
-	sessionManager := middleware.NewSessionManager(sessionSecret, env, logger)
-	authHandler := handler.NewAuthHandler(authService, sessionManager)
+	userRepo := infrastructure.NewGormUserRepository(db)
+	sessionRepo := infrastructure.NewGormSessionRepository(db)
+	passwordHasher := infrastructure.NewBcryptPasswordHasher()
+	authService := application.NewAuthService(userRepo, sessionRepo, passwordHasher, logger)
+	sessionManager := authinterfaces.NewSessionManager(sessionSecret, env, logger)
+	authHandler := authinterfaces.NewAuthHandler(authService, sessionManager)
 
 	// Build the router with the required middleware order:
 	//   1. Recovery  — catches panics, returns 500 instead of crashing
@@ -149,7 +149,7 @@ func run(logger *slog.Logger) error {
 	// Recovery + Logger + CORS chain. The order is therefore
 	// Recovery → Logger → CORS → SessionAuth → handler.
 	protected := router.Group("/api")
-	protected.Use(middleware.SessionAuth(authService, sessionManager))
+	protected.Use(authinterfaces.SessionAuth(authService, sessionManager))
 	{
 		protected.GET("/me", authHandler.GetCurrentUser)
 	}

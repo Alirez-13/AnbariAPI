@@ -1,14 +1,15 @@
 // # SINGLE REASON: Manage auth session cookies and Gin session middleware.
-package middleware
+package interfaces
 
 import (
-	"AnbariAPI/internal/auth/dto"
-	"AnbariAPI/internal/auth/service"
 	"errors"
 	"log/slog"
 	"net/http"
 	"os"
 	"strings"
+
+	"AnbariAPI/internal/auth/application"
+	"AnbariAPI/internal/auth/dto"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -21,12 +22,12 @@ const (
 	sessionValueKey   = "session_id"
 )
 
-type SessionManager struct {
+type CookieSessionManager struct {
 	store  *sessions.CookieStore
 	logger *slog.Logger
 }
 
-func NewSessionManager(secret, env string, logger *slog.Logger) *SessionManager {
+func NewSessionManager(secret, env string, logger *slog.Logger) *CookieSessionManager {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -34,21 +35,21 @@ func NewSessionManager(secret, env string, logger *slog.Logger) *SessionManager 
 	store.Options = &sessions.Options{
 		Path:     "/",
 		Domain:   strings.TrimSpace(os.Getenv(envSessionDomain)),
-		MaxAge:   int(service.SessionDuration.Seconds()),
+		MaxAge:   int(application.SessionDuration.Seconds()),
 		HttpOnly: true,
 		Secure:   !strings.EqualFold(env, "development"),
 		SameSite: http.SameSiteLaxMode,
 	}
-	return &SessionManager{store: store, logger: logger}
+	return &CookieSessionManager{store: store, logger: logger}
 }
 
-func (m *SessionManager) Create(c *gin.Context, sessionID string) error {
+func (m *CookieSessionManager) Create(c *gin.Context, sessionID string) error {
 	session, err := m.store.New(c.Request, sessionCookieName)
 	if err != nil {
 		return err
 	}
 	session.Values[sessionValueKey] = sessionID
-	session.Options.MaxAge = int(service.SessionDuration.Seconds())
+	session.Options.MaxAge = int(application.SessionDuration.Seconds())
 	if err := session.Save(c.Request, c.Writer); err != nil {
 		return err
 	}
@@ -56,7 +57,7 @@ func (m *SessionManager) Create(c *gin.Context, sessionID string) error {
 	return nil
 }
 
-func (m *SessionManager) Refresh(c *gin.Context) error {
+func (m *CookieSessionManager) Refresh(c *gin.Context) error {
 	session, err := m.store.Get(c.Request, sessionCookieName)
 	if err != nil {
 		return err
@@ -64,11 +65,11 @@ func (m *SessionManager) Refresh(c *gin.Context) error {
 	if _, ok := session.Values[sessionValueKey]; !ok {
 		return nil
 	}
-	session.Options.MaxAge = int(service.SessionDuration.Seconds())
+	session.Options.MaxAge = int(application.SessionDuration.Seconds())
 	return session.Save(c.Request, c.Writer)
 }
 
-func (m *SessionManager) SessionID(c *gin.Context) (string, error) {
+func (m *CookieSessionManager) SessionID(c *gin.Context) (string, error) {
 	session, err := m.store.Get(c.Request, sessionCookieName)
 	if err != nil {
 		return "", err
@@ -77,7 +78,7 @@ func (m *SessionManager) SessionID(c *gin.Context) (string, error) {
 	return sessionID, nil
 }
 
-func (m *SessionManager) Destroy(c *gin.Context) error {
+func (m *CookieSessionManager) Destroy(c *gin.Context) error {
 	session, err := m.store.Get(c.Request, sessionCookieName)
 	if err != nil {
 		return err
@@ -92,7 +93,7 @@ func (m *SessionManager) Destroy(c *gin.Context) error {
 	return nil
 }
 
-func SessionAuth(authService service.AuthService, sessionManager *SessionManager) gin.HandlerFunc {
+func SessionAuth(authService *application.AuthService, sessionManager *CookieSessionManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sessionIDStr, err := sessionManager.SessionID(c)
 		if err != nil {
@@ -118,7 +119,7 @@ func SessionAuth(authService service.AuthService, sessionManager *SessionManager
 
 		user, err := authService.ValidateSession(sessionID)
 		if err != nil {
-			if errors.Is(err, service.ErrSessionExpired) {
+			if errors.Is(err, application.ErrSessionExpired) {
 				if destroyErr := sessionManager.Destroy(c); destroyErr != nil {
 					slog.Warn("failed to destroy expired session cookie", slog.Any("error", destroyErr))
 				}
@@ -135,13 +136,7 @@ func SessionAuth(authService service.AuthService, sessionManager *SessionManager
 			return
 		}
 
-		currentUser := dto.UserDTO{
-			ID:        user.ID,
-			Email:     user.Email,
-			Phone:     user.Phone,
-			CreatedAt: user.CreatedAt,
-		}
-
+		currentUser := dto.UserDTO{ID: user.ID, Email: user.Email, Phone: user.Phone, CreatedAt: user.CreatedAt}
 		c.Set("currentUser", &currentUser)
 		c.Set("sessionID", sessionID)
 		c.Next()
